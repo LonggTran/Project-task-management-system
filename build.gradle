@@ -34,6 +34,9 @@ dependencies {
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     testImplementation 'org.springframework.boot:spring-boot-starter-validation-test'
+
+    //database: sql server
+    runtimeOnly 'com.microsoft.sqlserver:mssql-jdbc'
 }
 
 tasks.named('test') {
