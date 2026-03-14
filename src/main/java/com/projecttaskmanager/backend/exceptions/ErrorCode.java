@@ -17,7 +17,9 @@ public enum ErrorCode {
 
     INTERNAL_ERROR("INTERNAL_ERROR", "Internal server error"),
 
-    VALIDATION_ERROR("VALIDATION_ERROR", "Validation failed");
+    VALIDATION_ERROR("VALIDATION_ERROR", "Validation failed"),
+
+    EMAIL_ALREADY_EXISTS("EMAIL_ALREADY_EXISTS", "Email already exists");
 
     private final String code;
 
