@@ -22,5 +22,5 @@ public class Role {
     @Column(unique = true, nullable = false)
     private String name;
 
-    private String descripton;
+    private String description;
 }
