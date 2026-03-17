@@ -57,4 +57,16 @@ public class ProjectController {
                 .timestamp(Instant.now())
                 .build();
     }
+
+    @DeleteMapping("/{id}")
+    public ApiResponse<Void> deleteProject(@PathVariable UUID id) {
+
+        projectService.deleteProject(id);
+
+        return ApiResponse.<Void>builder()
+                .success(true)
+                .message("Project deleted")
+                .timestamp(Instant.now())
+                .build();
+    }
 }

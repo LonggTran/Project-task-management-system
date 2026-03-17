@@ -68,6 +68,12 @@ public class ProjectServiceImpl implements ProjectService {
         return mapToResponse(project);
     }
 
+    public void deleteProject(UUID id) {
+        Project project = projectRepository.findById(id)
+                .orElseThrow(() -> new AppException(ErrorCode.PROJECT_NOT_FOUND));
+        projectRepository.delete(project);
+    }
+
     private ProjectResponse mapToResponse(Project project) {
         return ProjectResponse.builder()
                 .id(project.getId())
