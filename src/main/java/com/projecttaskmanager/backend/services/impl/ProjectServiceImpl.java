@@ -6,11 +6,19 @@ import com.projecttaskmanager.backend.dto.response.project.ProjectResponse;
 import com.projecttaskmanager.backend.exceptions.AppException;
 import com.projecttaskmanager.backend.exceptions.ErrorCode;
 import com.projecttaskmanager.backend.models.Project;
+import com.projecttaskmanager.backend.models.ProjectMember;
+import com.projecttaskmanager.backend.models.User;
+import com.projecttaskmanager.backend.models.baseModels.ProjectMemberId;
+import com.projecttaskmanager.backend.models.emuns.ProjectRole;
+import com.projecttaskmanager.backend.repositories.ProjectMemberRepository;
 import com.projecttaskmanager.backend.repositories.ProjectRepository;
+import com.projecttaskmanager.backend.repositories.UserRepository;
 import com.projecttaskmanager.backend.services.ProjectService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -19,9 +27,18 @@ import java.util.UUID;
 public class ProjectServiceImpl implements ProjectService {
 
     private final ProjectRepository projectRepository;
+    private final ProjectMemberRepository projectMemberRepository;
+    private final UserRepository userRepository;
 
     @Override
     public ProjectResponse createProject(CreateProjectRequest request) {
+
+        String email = SecurityContextHolder.getContext()
+                .getAuthentication()
+                .getName();
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
         Project project = Project.builder()
                 .name(request.getName())
@@ -29,9 +46,20 @@ public class ProjectServiceImpl implements ProjectService {
                 .startDate(request.getStartDate())
                 .endDate(request.getEndDate())
                 .isArchived(false)
+                .owner(user)
                 .build();
 
         projectRepository.save(project);
+
+        ProjectMember owner = ProjectMember.builder()
+                .id(new ProjectMemberId(project.getId(), user.getId()))
+                .project(project)
+                .user(user)
+                .roleInProject(ProjectRole.OWNER)
+                .joinedAt(Instant.now())
+                .build();
+
+        projectMemberRepository.save(owner);
 
         return mapToResponse(project);
     }
