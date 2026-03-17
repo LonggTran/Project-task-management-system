@@ -5,12 +5,10 @@ import com.projecttaskmanager.backend.dto.response.ApiResponse;
 import com.projecttaskmanager.backend.dto.response.project.ProjectResponse;
 import com.projecttaskmanager.backend.services.ProjectService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
+import java.util.List;
 
 @RestController
 @RequestMapping("/projects")
@@ -25,6 +23,17 @@ public class ProjectController {
                 .success(true)
                 .message("Project created")
                 .data(projectService.createProject(request))
+                .timestamp(Instant.now())
+                .build();
+    }
+
+    @GetMapping
+    public ApiResponse<List<ProjectResponse>> getAllProjects() {
+
+        return ApiResponse.<List<ProjectResponse>>builder()
+                .success(true)
+                .message("All projects")
+                .data(projectService.getAllProjects())
                 .timestamp(Instant.now())
                 .build();
     }
