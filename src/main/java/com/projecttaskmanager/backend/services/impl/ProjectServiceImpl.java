@@ -1,6 +1,7 @@
 package com.projecttaskmanager.backend.services.impl;
 
 import com.projecttaskmanager.backend.dto.request.project.CreateProjectRequest;
+import com.projecttaskmanager.backend.dto.request.project.UpdateProjectRequest;
 import com.projecttaskmanager.backend.dto.response.project.ProjectResponse;
 import com.projecttaskmanager.backend.exceptions.AppException;
 import com.projecttaskmanager.backend.exceptions.ErrorCode;
@@ -47,6 +48,22 @@ public class ProjectServiceImpl implements ProjectService {
     public ProjectResponse getProjectById(UUID id) {
         Project project = projectRepository.findById(id)
                 .orElseThrow(() -> new AppException(ErrorCode.PROJECT_NOT_FOUND));
+
+        return mapToResponse(project);
+    }
+
+    @Override
+    public ProjectResponse updateProject(UUID id, UpdateProjectRequest request) {
+        Project project = projectRepository.findById(id)
+                .orElseThrow(() -> new AppException(ErrorCode.PROJECT_NOT_FOUND));
+
+        project.setName(request.getName());
+        project.setDescription(request.getDescription());
+        project.setStartDate(request.getStartDate());
+        project.setEndDate(request.getEndDate());
+        project.setIsArchived(request.getIsArchived());
+
+        projectRepository.save(project);
 
         return mapToResponse(project);
     }

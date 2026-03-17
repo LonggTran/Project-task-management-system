@@ -1,6 +1,7 @@
 package com.projecttaskmanager.backend.controllers;
 
 import com.projecttaskmanager.backend.dto.request.project.CreateProjectRequest;
+import com.projecttaskmanager.backend.dto.request.project.UpdateProjectRequest;
 import com.projecttaskmanager.backend.dto.response.ApiResponse;
 import com.projecttaskmanager.backend.dto.response.project.ProjectResponse;
 import com.projecttaskmanager.backend.services.ProjectService;
@@ -44,6 +45,15 @@ public class ProjectController {
         return ApiResponse.<ProjectResponse>builder()
                 .success(true)
                 .data(projectService.getProjectById(id))
+                .timestamp(Instant.now())
+                .build();
+    }
+
+    @PutMapping("/{id}")
+    public ApiResponse<ProjectResponse> updateProject(@PathVariable UUID id, @RequestBody UpdateProjectRequest request) {
+        return ApiResponse.<ProjectResponse>builder()
+                .success(true)
+                .data(projectService.updateProject(id, request))
                 .timestamp(Instant.now())
                 .build();
     }
