@@ -8,6 +8,8 @@ import com.projecttaskmanager.backend.services.ProjectService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+
 @Service
 @RequiredArgsConstructor
 public class ProjectServiceImpl implements ProjectService {
@@ -28,6 +30,14 @@ public class ProjectServiceImpl implements ProjectService {
         projectRepository.save(project);
 
         return mapToResponse(project);
+    }
+
+    @Override
+    public List<ProjectResponse> getAllProjects() {
+        return projectRepository.findAll()
+                .stream()
+                .map(this::mapToResponse)
+                .toList();
     }
 
     private ProjectResponse mapToResponse(Project project) {
