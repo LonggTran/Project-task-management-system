@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/projects")
@@ -34,6 +35,15 @@ public class ProjectController {
                 .success(true)
                 .message("All projects")
                 .data(projectService.getAllProjects())
+                .timestamp(Instant.now())
+                .build();
+    }
+
+    @GetMapping("/{id}")
+    public ApiResponse<ProjectResponse> getProjectById(@PathVariable UUID id) {
+        return ApiResponse.<ProjectResponse>builder()
+                .success(true)
+                .data(projectService.getProjectById(id))
                 .timestamp(Instant.now())
                 .build();
     }

@@ -4,8 +4,10 @@ import com.projecttaskmanager.backend.dto.request.project.CreateProjectRequest;
 import com.projecttaskmanager.backend.dto.response.project.ProjectResponse;
 
 import java.util.List;
+import java.util.UUID;
 
 public interface ProjectService {
     ProjectResponse createProject(CreateProjectRequest request);
     List<ProjectResponse> getAllProjects();
+    ProjectResponse getProjectById(UUID id);
 }
