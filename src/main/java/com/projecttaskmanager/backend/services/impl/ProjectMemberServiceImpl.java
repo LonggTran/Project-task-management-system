@@ -38,7 +38,7 @@ public class ProjectMemberServiceImpl implements ProjectMemberService {
                 .findByProjectAndUser(project, user)
                 .isPresent();
 
-        if (exists) {
+        if (exists || request.getRoleInProject() == null) {
             throw new AppException(ErrorCode.VALIDATION_ERROR);
         }
 
