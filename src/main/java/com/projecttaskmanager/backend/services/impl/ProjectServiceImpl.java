@@ -2,6 +2,8 @@ package com.projecttaskmanager.backend.services.impl;
 
 import com.projecttaskmanager.backend.dto.request.project.CreateProjectRequest;
 import com.projecttaskmanager.backend.dto.response.project.ProjectResponse;
+import com.projecttaskmanager.backend.exceptions.AppException;
+import com.projecttaskmanager.backend.exceptions.ErrorCode;
 import com.projecttaskmanager.backend.models.Project;
 import com.projecttaskmanager.backend.repositories.ProjectRepository;
 import com.projecttaskmanager.backend.services.ProjectService;
@@ -9,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -38,6 +41,14 @@ public class ProjectServiceImpl implements ProjectService {
                 .stream()
                 .map(this::mapToResponse)
                 .toList();
+    }
+
+    @Override
+    public ProjectResponse getProjectById(UUID id) {
+        Project project = projectRepository.findById(id)
+                .orElseThrow(() -> new AppException(ErrorCode.PROJECT_NOT_FOUND));
+
+        return mapToResponse(project);
     }
 
     private ProjectResponse mapToResponse(Project project) {
