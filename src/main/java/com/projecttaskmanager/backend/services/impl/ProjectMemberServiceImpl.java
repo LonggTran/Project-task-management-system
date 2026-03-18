@@ -5,10 +5,12 @@ import com.projecttaskmanager.backend.exceptions.AppException;
 import com.projecttaskmanager.backend.exceptions.ErrorCode;
 import com.projecttaskmanager.backend.models.Project;
 import com.projecttaskmanager.backend.models.ProjectMember;
+import com.projecttaskmanager.backend.models.ProjectRole;
 import com.projecttaskmanager.backend.models.User;
 import com.projecttaskmanager.backend.models.baseModels.ProjectMemberId;
 import com.projecttaskmanager.backend.repositories.ProjectMemberRepository;
 import com.projecttaskmanager.backend.repositories.ProjectRepository;
+import com.projecttaskmanager.backend.repositories.ProjectRoleRepository;
 import com.projecttaskmanager.backend.repositories.UserRepository;
 import com.projecttaskmanager.backend.services.ProjectMemberService;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +26,7 @@ public class ProjectMemberServiceImpl implements ProjectMemberService {
     private final ProjectRepository projectRepository;
     private final UserRepository userRepository;
     private final ProjectMemberRepository projectMemberRepository;
+    private final ProjectRoleRepository projectRoleRepository;
 
     @Override
     public void addMember(UUID projectId, AddMemberRequest request) {
@@ -34,11 +37,14 @@ public class ProjectMemberServiceImpl implements ProjectMemberService {
         User user = userRepository.findById(request.getUserId())
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
+        ProjectRole role = projectRoleRepository.findByName(request.getRoleInProject())
+                .orElseThrow(() -> new AppException(ErrorCode.VALIDATION_ERROR));
+
         boolean exists = projectMemberRepository
                 .findByProjectAndUser(project, user)
                 .isPresent();
 
-        if (exists || request.getRoleInProject() == null) {
+        if (exists) {
             throw new AppException(ErrorCode.VALIDATION_ERROR);
         }
 
@@ -46,7 +52,7 @@ public class ProjectMemberServiceImpl implements ProjectMemberService {
                 .id(new ProjectMemberId(projectId, user.getId()))
                 .project(project)
                 .user(user)
-                .roleInProject(request.getRoleInProject())
+                .projectRole(role)
                 .joinedAt(Instant.now())
                 .build();
 

@@ -7,11 +7,12 @@ import com.projecttaskmanager.backend.exceptions.AppException;
 import com.projecttaskmanager.backend.exceptions.ErrorCode;
 import com.projecttaskmanager.backend.models.Project;
 import com.projecttaskmanager.backend.models.ProjectMember;
+import com.projecttaskmanager.backend.models.ProjectRole;
 import com.projecttaskmanager.backend.models.User;
 import com.projecttaskmanager.backend.models.baseModels.ProjectMemberId;
-import com.projecttaskmanager.backend.models.emuns.ProjectRole;
 import com.projecttaskmanager.backend.repositories.ProjectMemberRepository;
 import com.projecttaskmanager.backend.repositories.ProjectRepository;
+import com.projecttaskmanager.backend.repositories.ProjectRoleRepository;
 import com.projecttaskmanager.backend.repositories.UserRepository;
 import com.projecttaskmanager.backend.services.ProjectService;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +30,7 @@ public class ProjectServiceImpl implements ProjectService {
     private final ProjectRepository projectRepository;
     private final ProjectMemberRepository projectMemberRepository;
     private final UserRepository userRepository;
+    private final ProjectRoleRepository projectRoleRepository;
 
     @Override
     public ProjectResponse createProject(CreateProjectRequest request) {
@@ -39,6 +41,9 @@ public class ProjectServiceImpl implements ProjectService {
 
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+
+        ProjectRole ownerRole = projectRoleRepository.findByName("OWNER")
+                .orElseThrow(() -> new AppException(ErrorCode.INTERNAL_ERROR));
 
         Project project = Project.builder()
                 .name(request.getName())
@@ -55,7 +60,7 @@ public class ProjectServiceImpl implements ProjectService {
                 .id(new ProjectMemberId(project.getId(), user.getId()))
                 .project(project)
                 .user(user)
-                .roleInProject(ProjectRole.OWNER)
+                .projectRole(ownerRole)
                 .joinedAt(Instant.now())
                 .build();
 

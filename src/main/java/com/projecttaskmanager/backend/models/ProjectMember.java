@@ -1,7 +1,6 @@
 package com.projecttaskmanager.backend.models;
 
 import com.projecttaskmanager.backend.models.baseModels.ProjectMemberId;
-import com.projecttaskmanager.backend.models.emuns.ProjectRole;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -26,9 +25,9 @@ public class ProjectMember {
     @MapsId("userId")
     private User user;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "role_in_project")
-    private ProjectRole roleInProject;
+    @ManyToOne
+    @JoinColumn(name = "project_role_id")
+    private ProjectRole projectRole;
 
     private Instant joinedAt;
 }
