@@ -1,8 +1,10 @@
 package com.projecttaskmanager.backend.services.impl;
 
 import com.projecttaskmanager.backend.dto.request.project.AddMemberRequest;
+import com.projecttaskmanager.backend.dto.response.project.ProjectMemberResponse;
 import com.projecttaskmanager.backend.exceptions.AppException;
 import com.projecttaskmanager.backend.exceptions.ErrorCode;
+import com.projecttaskmanager.backend.mapper.ProjectMemberMapper;
 import com.projecttaskmanager.backend.models.Project;
 import com.projecttaskmanager.backend.models.ProjectMember;
 import com.projecttaskmanager.backend.models.ProjectRole;
@@ -12,6 +14,7 @@ import com.projecttaskmanager.backend.repositories.ProjectMemberRepository;
 import com.projecttaskmanager.backend.repositories.ProjectRepository;
 import com.projecttaskmanager.backend.repositories.ProjectRoleRepository;
 import com.projecttaskmanager.backend.repositories.UserRepository;
+import com.projecttaskmanager.backend.services.ProjectAuthorizationService;
 import com.projecttaskmanager.backend.services.ProjectMemberService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -27,9 +30,12 @@ public class ProjectMemberServiceImpl implements ProjectMemberService {
     private final UserRepository userRepository;
     private final ProjectMemberRepository projectMemberRepository;
     private final ProjectRoleRepository projectRoleRepository;
+    private final ProjectAuthorizationService authorizationService;
+    private final ProjectMemberMapper projectMemberMapper;
 
     @Override
-    public void addMember(UUID projectId, AddMemberRequest request) {
+    public ProjectMemberResponse addMember(UUID projectId, AddMemberRequest request) {
+        authorizationService.checkPermission(projectId, "MEMBER_ADD");
 
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new AppException(ErrorCode.PROJECT_NOT_FOUND));
@@ -37,7 +43,7 @@ public class ProjectMemberServiceImpl implements ProjectMemberService {
         User user = userRepository.findById(request.getUserId())
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
-        ProjectRole role = projectRoleRepository.findByName(request.getRoleInProject())
+        ProjectRole role = projectRoleRepository.findByName(request.getProjectRole())
                 .orElseThrow(() -> new AppException(ErrorCode.VALIDATION_ERROR));
 
         boolean exists = projectMemberRepository
@@ -56,6 +62,8 @@ public class ProjectMemberServiceImpl implements ProjectMemberService {
                 .joinedAt(Instant.now())
                 .build();
 
-        projectMemberRepository.save(member);
+        ProjectMember saved = projectMemberRepository.save(member);
+
+        return projectMemberMapper.toResponse(saved);
     }
 }
