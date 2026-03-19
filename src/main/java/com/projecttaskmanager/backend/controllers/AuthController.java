@@ -19,7 +19,6 @@ public class AuthController {
 
     @PostMapping("/register")
     public ApiResponse<AuthResponse> register(@RequestBody RegisterRequest request) {
-
         return ApiResponse.<AuthResponse>builder()
                 .success(true)
                 .message("Register success")
@@ -30,7 +29,6 @@ public class AuthController {
 
     @PostMapping("/login")
     public ApiResponse<AuthResponse> login(@RequestBody LoginRequest request) {
-
         return ApiResponse.<AuthResponse>builder()
                 .success(true)
                 .message("Login success")

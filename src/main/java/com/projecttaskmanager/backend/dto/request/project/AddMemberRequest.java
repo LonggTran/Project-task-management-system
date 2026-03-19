@@ -7,5 +7,5 @@ import java.util.UUID;
 @Data
 public class AddMemberRequest {
     private UUID userId;
-    private String roleInProject;
+    private String projectRole;
 }

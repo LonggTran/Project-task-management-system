@@ -1,6 +1,6 @@
 package com.projecttaskmanager.backend.dto.response.project;
 
-import com.projecttaskmanager.backend.models.emuns.ProjectRole;
+import com.projecttaskmanager.backend.dto.response.UserResponse;
 import lombok.Builder;
 import lombok.Data;
 
@@ -10,9 +10,7 @@ import java.util.UUID;
 @Data
 @Builder
 public class ProjectMemberResponse {
-    private UUID userId;
-    private String email;
-    private String fullName;
-    private ProjectRole roleInProject;
+    private UserResponse user;
+    private String projectRole;
     private Instant joinedAt;
 }

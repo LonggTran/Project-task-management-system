@@ -3,6 +3,7 @@ package com.projecttaskmanager.backend.services;
 import com.projecttaskmanager.backend.dto.request.project.CreateProjectRequest;
 import com.projecttaskmanager.backend.dto.request.project.UpdateProjectRequest;
 import com.projecttaskmanager.backend.dto.response.project.ProjectResponse;
+import com.projecttaskmanager.backend.models.Project;
 
 import java.util.List;
 import java.util.UUID;

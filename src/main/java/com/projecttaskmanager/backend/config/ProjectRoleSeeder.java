@@ -22,14 +22,12 @@ public class ProjectRoleSeeder implements CommandLineRunner {
     @Override
     public void run(String... args) {
 
-        // ===== Permissions =====
         Permission read = createPermission("PROJECT_READ");
         Permission update = createPermission("PROJECT_UPDATE");
         Permission delete = createPermission("PROJECT_DELETE");
         Permission addMember = createPermission("MEMBER_ADD");
         Permission removeMember = createPermission("MEMBER_REMOVE");
 
-        // ===== Roles =====
         createRole("OWNER", Set.of(read, update, delete, addMember, removeMember));
         createRole("ADMIN_PROJECT", Set.of(read, update, addMember));
         createRole("MEMBER", Set.of(read));
