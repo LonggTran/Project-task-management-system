@@ -51,7 +51,7 @@ public class ProjectMemberServiceImpl implements ProjectMemberService {
                 .isPresent();
 
         if (exists) {
-            throw new AppException(ErrorCode.VALIDATION_ERROR);
+            throw new AppException(ErrorCode.USER_ALREADY_IN_PROJECT);
         }
 
         ProjectMember member = ProjectMember.builder()
@@ -65,5 +65,27 @@ public class ProjectMemberServiceImpl implements ProjectMemberService {
         ProjectMember saved = projectMemberRepository.save(member);
 
         return projectMemberMapper.toResponse(saved);
+    }
+
+    @Override
+    public void removeMember(UUID projectId, UUID userId) {
+
+        authorizationService.checkPermission(projectId, "MEMBER_REMOVE");
+
+        Project project = projectRepository.findById(projectId)
+                .orElseThrow(() -> new AppException(ErrorCode.PROJECT_NOT_FOUND));
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+
+        ProjectMember member = projectMemberRepository
+                .findByProjectAndUser(project, user)
+                .orElseThrow(() -> new AppException(ErrorCode.VALIDATION_ERROR));
+
+        if (member.getProjectRole().getName().equals("OWNER")) {
+            throw new AppException(ErrorCode.FORBIDDEN);
+        }
+
+        projectMemberRepository.delete(member);
     }
 }

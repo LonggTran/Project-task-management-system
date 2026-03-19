@@ -26,7 +26,7 @@ public class ProjectRole {
 
     private String description;
 
-    @ManyToMany(fetch = FetchType.LAZY)
+    @ManyToMany
     @JoinTable(
             name = "project_role_permissions",
             joinColumns = @JoinColumn(name = "role_id"),
