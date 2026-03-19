@@ -120,6 +120,7 @@ public class ProjectServiceImpl implements ProjectService {
     }
 
     @Override
+    @Transactional
     public void deleteProject(UUID id) {
 
         authorizationService.checkPermission(id, "PROJECT_DELETE");
@@ -127,6 +128,7 @@ public class ProjectServiceImpl implements ProjectService {
         Project project = projectRepository.findById(id)
                 .orElseThrow(() -> new AppException(ErrorCode.PROJECT_NOT_FOUND));
 
+        projectMemberRepository.deleteByProject(project);
         projectRepository.delete(project);
     }
 }
