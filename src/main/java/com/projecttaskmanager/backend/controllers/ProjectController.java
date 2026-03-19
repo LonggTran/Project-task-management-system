@@ -31,7 +31,6 @@ public class ProjectController {
 
     @GetMapping
     public ApiResponse<List<ProjectResponse>> getAllProjects() {
-
         return ApiResponse.<List<ProjectResponse>>builder()
                 .success(true)
                 .message("All projects")
