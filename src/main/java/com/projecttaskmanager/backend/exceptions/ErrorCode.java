@@ -19,7 +19,9 @@ public enum ErrorCode {
 
     VALIDATION_ERROR("VALIDATION_ERROR", "Validation failed"),
 
-    EMAIL_ALREADY_EXISTS("EMAIL_ALREADY_EXISTS", "Email already exists");
+    EMAIL_ALREADY_EXISTS("EMAIL_ALREADY_EXISTS", "Email already exists"),
+
+    USER_ALREADY_IN_PROJECT("USER_ALREADY_IN_PROJECT", "User already in project");
 
     private final String code;
 

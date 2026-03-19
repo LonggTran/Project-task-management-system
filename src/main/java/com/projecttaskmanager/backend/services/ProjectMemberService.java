@@ -8,4 +8,5 @@ import java.util.UUID;
 
 public interface ProjectMemberService {
     ProjectMemberResponse addMember(UUID projectId, AddMemberRequest request);
+    void removeMember(UUID projectId, UUID userId);
 }
