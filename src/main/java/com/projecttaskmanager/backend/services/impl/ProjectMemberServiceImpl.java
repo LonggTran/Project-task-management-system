@@ -20,6 +20,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -65,6 +66,20 @@ public class ProjectMemberServiceImpl implements ProjectMemberService {
         ProjectMember saved = projectMemberRepository.save(member);
 
         return projectMemberMapper.toResponse(saved);
+    }
+
+    @Override
+    public List<ProjectMemberResponse> getMembers(UUID projectId) {
+
+        authorizationService.checkProjectMember(projectId);
+
+        Project project = projectRepository.findById(projectId)
+                .orElseThrow(() -> new AppException(ErrorCode.PROJECT_NOT_FOUND));
+
+        return projectMemberRepository.findByProject(project)
+                .stream()
+                .map(projectMemberMapper::toResponse)
+                .toList();
     }
 
     @Override

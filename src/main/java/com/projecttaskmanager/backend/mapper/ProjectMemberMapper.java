@@ -13,6 +13,7 @@ public class ProjectMemberMapper {
 
     public ProjectMemberResponse toResponse(ProjectMember member) {
         return ProjectMemberResponse.builder()
+                .projectId(member.getId().getProjectId())
                 .user(userMapper.toResponse(member.getUser()))
                 .projectRole(member.getProjectRole().getName())
                 .joinedAt(member.getJoinedAt())
