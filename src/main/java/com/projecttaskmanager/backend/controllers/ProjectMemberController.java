@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -23,6 +24,16 @@ public class ProjectMemberController {
                 .success(true)
                 .message("Member added")
                 .data(projectMemberService.addMember(projectId, request))
+                .timestamp(Instant.now())
+                .build();
+    }
+
+    @GetMapping
+    public ApiResponse<List<ProjectMemberResponse>> getMembers(@PathVariable UUID projectId) {
+        return ApiResponse.<List<ProjectMemberResponse>>builder()
+                .success(true)
+                .message("Members fetched")
+                .data(projectMemberService.getMembers(projectId))
                 .timestamp(Instant.now())
                 .build();
     }
