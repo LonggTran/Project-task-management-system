@@ -11,4 +11,5 @@ public interface ProjectMemberService {
     ProjectMemberResponse addMember(UUID projectId, AddMemberRequest request);
     void removeMember(UUID projectId, UUID userId);
     List<ProjectMemberResponse> getMembers(UUID projectId);
+    void updateMemberRole(UUID projectId, UUID userId, String role);
 }

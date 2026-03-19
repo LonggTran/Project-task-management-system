@@ -106,7 +106,7 @@ public class ProjectServiceImpl implements ProjectService {
         authorizationService.checkPermission(id, "PROJECT_UPDATE");
 
         Project project = projectRepository.findById(id)
-                .orElseThrow(() -> new AppException(ErrorCode.PROJECT_NOT_FOUND));
+                .orElseThrow(() -> new AppException(ErrorCode.FORBIDDEN));
 
         project.setName(request.getName());
         project.setDescription(request.getDescription());
