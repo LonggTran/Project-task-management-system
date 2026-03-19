@@ -27,9 +27,10 @@ public class ProjectRoleSeeder implements CommandLineRunner {
         Permission delete = createPermission("PROJECT_DELETE");
         Permission addMember = createPermission("MEMBER_ADD");
         Permission removeMember = createPermission("MEMBER_REMOVE");
+        Permission updateMember = createPermission("MEMBER_UPDATE");
 
-        createRole("OWNER", Set.of(read, update, delete, addMember, removeMember));
-        createRole("ADMIN_PROJECT", Set.of(read, update, addMember));
+        createRole("OWNER", Set.of(read, update, delete, addMember, removeMember, updateMember));
+        createRole("ADMIN_PROJECT", Set.of(read, update, addMember, updateMember));
         createRole("MEMBER", Set.of(read));
     }
 

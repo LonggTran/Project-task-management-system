@@ -103,4 +103,31 @@ public class ProjectMemberServiceImpl implements ProjectMemberService {
 
         projectMemberRepository.delete(member);
     }
+
+    @Override
+    public void updateMemberRole(UUID projectId, UUID userId, String roleName) {
+
+        authorizationService.checkPermission(projectId, "MEMBER_ADD");
+
+        Project project = projectRepository.findById(projectId)
+                .orElseThrow(() -> new AppException(ErrorCode.PROJECT_NOT_FOUND));
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+
+        ProjectMember member = projectMemberRepository
+                .findByProjectAndUser(project, user)
+                .orElseThrow(() -> new AppException(ErrorCode.VALIDATION_ERROR));
+
+        if (member.getProjectRole().getName().equals("OWNER")) {
+            throw new AppException(ErrorCode.FORBIDDEN);
+        }
+
+        ProjectRole newRole = projectRoleRepository.findByName(roleName)
+                .orElseThrow(() -> new AppException(ErrorCode.VALIDATION_ERROR));
+
+        member.setProjectRole(newRole);
+
+        projectMemberRepository.save(member);
+    }
 }
