@@ -9,12 +9,8 @@ import java.time.Instant;
 @Builder
 public class ApiResponse<T> {
     private Boolean success;
-
     private String message;
-
     private String errorCode;
-
     private T data;
-
     private Instant timestamp;
 }

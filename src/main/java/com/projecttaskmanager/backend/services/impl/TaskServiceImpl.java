@@ -54,7 +54,7 @@ public class TaskServiceImpl implements TaskService {
                 .type(request.getType())
                 .dueDate(request.getDueDate())
                 .estimatedTime(request.getEstimatedTime())
-                .createdBy(creator)  // tự gán
+                .createdBy(creator)
                 .build();
 
         return taskMapper.toResponse(taskRepository.save(task));

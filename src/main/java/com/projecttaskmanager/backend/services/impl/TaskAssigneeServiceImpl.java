@@ -1,0 +1,102 @@
+package com.projecttaskmanager.backend.services.impl;
+
+import com.projecttaskmanager.backend.dto.request.task.AssignTaskRequest;
+import com.projecttaskmanager.backend.dto.response.task.TaskAssigneeResponse;
+import com.projecttaskmanager.backend.exceptions.AppException;
+import com.projecttaskmanager.backend.exceptions.ErrorCode;
+import com.projecttaskmanager.backend.mapper.TaskAssigneeMapper;
+import com.projecttaskmanager.backend.models.Task;
+import com.projecttaskmanager.backend.models.TaskAssignee;
+import com.projecttaskmanager.backend.models.User;
+import com.projecttaskmanager.backend.repositories.TaskAssigneeRepository;
+import com.projecttaskmanager.backend.repositories.TaskRepository;
+import com.projecttaskmanager.backend.repositories.UserRepository;
+import com.projecttaskmanager.backend.services.TaskAssigneeService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+import java.util.UUID;
+
+@Service
+@RequiredArgsConstructor
+public class TaskAssigneeServiceImpl implements TaskAssigneeService {
+
+    private final TaskAssigneeRepository assigneeRepository;
+    private final TaskRepository taskRepository;
+    private final UserRepository userRepository;
+    private final TaskAssigneeMapper mapper;
+
+    @Override
+    public TaskAssigneeResponse assignTask(AssignTaskRequest request) {
+
+        Task task = taskRepository.findById(request.getTaskId())
+                .orElseThrow(() -> new AppException(ErrorCode.TASK_NOT_FOUND));
+
+        User user = userRepository.findById(request.getUserId())
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+
+        // kiểm tra đã gán chưa
+        assigneeRepository.findByTaskAndUser(task, user).ifPresent(a -> {
+            throw new AppException(ErrorCode.VALIDATION_ERROR);
+        });
+
+        TaskAssignee assignee = TaskAssignee.builder()
+                .task(task)
+                .user(user)
+                .build();
+
+        return mapper.toResponse(assigneeRepository.save(assignee));
+    }
+
+    @Override
+    public TaskAssigneeResponse assignToMe(UUID taskId) {
+
+        Task task = taskRepository.findById(taskId)
+                .orElseThrow(() -> new AppException(ErrorCode.TASK_NOT_FOUND));
+
+        // Lấy user hiện tại từ SecurityContext
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+
+        // Kiểm tra đã assign chưa
+        assigneeRepository.findByTaskAndUser(task, user)
+                .ifPresent(a -> { throw new AppException(ErrorCode.VALIDATION_ERROR); });
+
+        TaskAssignee assignee = TaskAssignee.builder()
+                .task(task)
+                .user(user)
+                .build();
+
+        return mapper.toResponse(assigneeRepository.save(assignee));
+    }
+
+    @Override
+    public void unassignTask(AssignTaskRequest request) {
+
+        Task task = taskRepository.findById(request.getTaskId())
+                .orElseThrow(() -> new AppException(ErrorCode.TASK_NOT_FOUND));
+
+        User user = userRepository.findById(request.getUserId())
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+
+        TaskAssignee assignee = assigneeRepository.findByTaskAndUser(task, user)
+                .orElseThrow(() -> new AppException(ErrorCode.VALIDATION_ERROR));
+
+        assigneeRepository.delete(assignee);
+    }
+
+    @Override
+    public List<TaskAssigneeResponse> getAssignees(UUID taskId) {
+
+        Task task = taskRepository.findById(taskId)
+                .orElseThrow(() -> new AppException(ErrorCode.TASK_NOT_FOUND));
+
+        return assigneeRepository.findByTask(task)
+                .stream()
+                .map(mapper::toResponse)
+                .toList();
+    }
+}
