@@ -27,9 +27,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<?>> handleGeneralException(Exception ex) {
 
+        ex.printStackTrace();
+
         ApiResponse<?> response = ApiResponse.builder()
                 .success(false)
-                .message("Unexpected error occurred")
+                .message(ex.getMessage())
                 .errorCode(ErrorCode.INTERNAL_ERROR.getCode())
                 .timestamp(Instant.now())
                 .build();
