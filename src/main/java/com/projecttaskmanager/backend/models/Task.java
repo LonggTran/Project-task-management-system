@@ -54,4 +54,12 @@ public class Task extends BaseEntity {
 
     @OneToMany(mappedBy = "parentTask")
     private Set<Task> subtasks;
+
+    @ManyToMany
+    @JoinTable(
+            name = "task_labels",
+            joinColumns = @JoinColumn(name = "task_id"),
+            inverseJoinColumns = @JoinColumn(name = "label_id")
+    )
+    private Set<Label> labels;
 }
