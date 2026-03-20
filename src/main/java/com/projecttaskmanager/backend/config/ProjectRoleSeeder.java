@@ -1,7 +1,7 @@
 package com.projecttaskmanager.backend.config;
 
-import com.projecttaskmanager.backend.models.ProjectRole;
 import com.projecttaskmanager.backend.models.Permission;
+import com.projecttaskmanager.backend.models.ProjectRole;
 import com.projecttaskmanager.backend.repositories.PermissionRepository;
 import com.projecttaskmanager.backend.repositories.ProjectRoleRepository;
 import lombok.RequiredArgsConstructor;
@@ -22,16 +22,102 @@ public class ProjectRoleSeeder implements CommandLineRunner {
     @Override
     public void run(String... args) {
 
-        Permission read = createPermission("PROJECT_READ");
-        Permission update = createPermission("PROJECT_UPDATE");
-        Permission delete = createPermission("PROJECT_DELETE");
-        Permission addMember = createPermission("MEMBER_ADD");
-        Permission removeMember = createPermission("MEMBER_REMOVE");
-        Permission updateMember = createPermission("MEMBER_UPDATE");
+        // =======================
+        // PROJECT PERMISSIONS
+        // =======================
+        Permission projectRead = createPermission("PROJECT_READ");
+        Permission projectCreate = createPermission("PROJECT_CREATE");
+        Permission projectUpdate = createPermission("PROJECT_UPDATE");
+        Permission projectDelete = createPermission("PROJECT_DELETE");
+        Permission projectArchive = createPermission("PROJECT_ARCHIVE");
 
-        createRole("OWNER", Set.of(read, update, delete, addMember, removeMember, updateMember));
-        createRole("ADMIN_PROJECT", Set.of(read, update, addMember, updateMember));
-        createRole("MEMBER", Set.of(read));
+        // =======================
+        // MEMBER PERMISSIONS
+        // =======================
+        Permission memberAdd = createPermission("MEMBER_ADD");
+        Permission memberRemove = createPermission("MEMBER_REMOVE");
+        Permission memberUpdate = createPermission("MEMBER_UPDATE");
+        Permission memberView = createPermission("MEMBER_VIEW");
+
+        // =======================
+        // TASK PERMISSIONS
+        // =======================
+        Permission taskCreate = createPermission("TASK_CREATE");
+        Permission taskUpdate = createPermission("TASK_UPDATE");
+        Permission taskDelete = createPermission("TASK_DELETE");
+        Permission taskView = createPermission("TASK_VIEW");
+        Permission taskAssign = createPermission("TASK_ASSIGN");
+        Permission taskComment = createPermission("TASK_COMMENT");
+        Permission taskLabel = createPermission("TASK_LABEL");
+        Permission taskDependency = createPermission("TASK_DEPENDENCY");
+        Permission taskPriority = createPermission("TASK_PRIORITY");
+        Permission taskStatus = createPermission("TASK_STATUS");
+
+        // =======================
+        // EPIC PERMISSIONS
+        // =======================
+        Permission epicCreate = createPermission("EPIC_CREATE");
+        Permission epicUpdate = createPermission("EPIC_UPDATE");
+        Permission epicDelete = createPermission("EPIC_DELETE");
+        Permission epicView = createPermission("EPIC_VIEW");
+
+        // =======================
+        // SPRINT PERMISSIONS
+        // =======================
+        Permission sprintCreate = createPermission("SPRINT_CREATE");
+        Permission sprintUpdate = createPermission("SPRINT_UPDATE");
+        Permission sprintDelete = createPermission("SPRINT_DELETE");
+        Permission sprintView = createPermission("SPRINT_VIEW");
+
+        // =======================
+        // ATTACHMENT PERMISSIONS
+        // =======================
+        Permission attachmentUpload = createPermission("ATTACHMENT_UPLOAD");
+        Permission attachmentDelete = createPermission("ATTACHMENT_DELETE");
+        Permission attachmentView = createPermission("ATTACHMENT_VIEW");
+
+        // =======================
+        // NOTIFICATION PERMISSIONS
+        // =======================
+        Permission notificationSend = createPermission("NOTIFICATION_SEND");
+        Permission notificationView = createPermission("NOTIFICATION_VIEW");
+
+        // =======================
+        // CREATE ROLES
+        // =======================
+
+        // OWNER → full permissions
+        createRole("OWNER", Set.of(
+                projectRead, projectCreate, projectUpdate, projectDelete, projectArchive,
+                memberAdd, memberRemove, memberUpdate, memberView,
+                taskCreate, taskUpdate, taskDelete, taskView, taskAssign, taskComment, taskLabel, taskDependency, taskPriority, taskStatus,
+                epicCreate, epicUpdate, epicDelete, epicView,
+                sprintCreate, sprintUpdate, sprintDelete, sprintView,
+                attachmentUpload, attachmentDelete, attachmentView,
+                notificationSend, notificationView
+        ));
+
+        // ADMIN_PROJECT → can manage project & tasks but not delete project
+        createRole("ADMIN_PROJECT", Set.of(
+                projectRead, projectUpdate,
+                memberAdd, memberUpdate, memberView,
+                taskCreate, taskUpdate, taskDelete, taskView, taskAssign, taskComment, taskLabel, taskDependency, taskPriority, taskStatus,
+                epicCreate, epicUpdate, epicDelete, epicView,
+                sprintCreate, sprintUpdate, sprintDelete, sprintView,
+                attachmentUpload, attachmentDelete, attachmentView,
+                notificationSend, notificationView
+        ));
+
+        // MEMBER → basic access
+        createRole("MEMBER", Set.of(
+                projectRead,
+                memberView,
+                taskView, taskComment, taskLabel,
+                epicView,
+                sprintView,
+                attachmentUpload, attachmentView,
+                notificationView
+        ));
     }
 
     private Permission createPermission(String name) {
