@@ -62,4 +62,8 @@ public class Task extends BaseEntity {
             inverseJoinColumns = @JoinColumn(name = "label_id")
     )
     private Set<Label> labels;
+
+    @ManyToOne
+    @JoinColumn(name = "epic_id")
+    private Epic epic;
 }
