@@ -9,4 +9,10 @@ import java.util.UUID;
 
 public interface TaskRepository extends JpaRepository<Task, UUID> {
     List<Task> findAllByProject(Project project);
+
+    List<Task> findAllByParentTask(Task parentTask);
+
+    List<Task> findAllByParentTaskId(UUID parentTaskId);
+
+    boolean existsByParentTaskId(UUID parentTaskId);
 }
