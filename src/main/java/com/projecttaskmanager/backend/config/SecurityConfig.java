@@ -33,6 +33,7 @@ public class SecurityConfig {
                         .requestMatchers("/task-assignees/**").authenticated()
                         .requestMatchers("/attachments/**").authenticated()
                         .requestMatchers("/subtasks/**").authenticated()
+                        .requestMatchers("/workflows/**").authenticated()
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
