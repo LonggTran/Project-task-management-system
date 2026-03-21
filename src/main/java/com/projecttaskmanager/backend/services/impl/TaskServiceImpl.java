@@ -15,6 +15,7 @@ import com.projecttaskmanager.backend.repositories.TaskRepository;
 import com.projecttaskmanager.backend.repositories.TaskStatusRepository;
 import com.projecttaskmanager.backend.repositories.UserRepository;
 import com.projecttaskmanager.backend.services.TaskService;
+import com.projecttaskmanager.backend.services.WorkflowService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -30,6 +31,7 @@ public class TaskServiceImpl implements TaskService {
     private final ProjectRepository projectRepository;
     private final UserRepository userRepository;
     private final TaskStatusRepository taskStatusRepository;
+    private final WorkflowService workflowService;
     private final TaskMapper taskMapper;
 
     @Override
@@ -68,10 +70,23 @@ public class TaskServiceImpl implements TaskService {
 
         if (request.getTitle() != null) task.setTitle(request.getTitle());
         if (request.getDescription() != null) task.setDescription(request.getDescription());
+//        if (request.getStatusId() != null) {
+//            TaskStatus status = taskStatusRepository.findById(request.getStatusId())
+//                    .orElseThrow(() -> new AppException(ErrorCode.TASK_NOT_FOUND));
+//            task.setStatus(status);
+//        }
+
         if (request.getStatusId() != null) {
-            TaskStatus status = taskStatusRepository.findById(request.getStatusId())
+            TaskStatus newStatus = taskStatusRepository.findById(request.getStatusId())
                     .orElseThrow(() -> new AppException(ErrorCode.TASK_NOT_FOUND));
-            task.setStatus(status);
+
+            workflowService.validateTransition(
+                    task.getProject().getId(),
+                    task.getStatus(),
+                    newStatus
+            );
+
+            task.setStatus(newStatus);
         }
         if (request.getPriority() != null) task.setPriority(request.getPriority());
         if (request.getType() != null) task.setType(request.getType());
