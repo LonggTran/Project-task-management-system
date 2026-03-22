@@ -3,6 +3,8 @@ package com.projecttaskmanager.backend.services.impl;
 import com.projecttaskmanager.backend.dto.request.task.CreateTaskRequest;
 import com.projecttaskmanager.backend.dto.request.task.UpdateTaskRequest;
 import com.projecttaskmanager.backend.dto.response.task.TaskResponse;
+import com.projecttaskmanager.backend.events.ActivityEvent;
+import com.projecttaskmanager.backend.events.ActivityHelper;
 import com.projecttaskmanager.backend.exceptions.AppException;
 import com.projecttaskmanager.backend.exceptions.ErrorCode;
 import com.projecttaskmanager.backend.mapper.TaskMapper;
@@ -10,6 +12,7 @@ import com.projecttaskmanager.backend.models.Project;
 import com.projecttaskmanager.backend.models.Task;
 import com.projecttaskmanager.backend.models.TaskStatus;
 import com.projecttaskmanager.backend.models.User;
+import com.projecttaskmanager.backend.models.enums.ActivityAction;
 import com.projecttaskmanager.backend.repositories.ProjectRepository;
 import com.projecttaskmanager.backend.repositories.TaskRepository;
 import com.projecttaskmanager.backend.repositories.TaskStatusRepository;
@@ -17,6 +20,7 @@ import com.projecttaskmanager.backend.repositories.UserRepository;
 import com.projecttaskmanager.backend.services.TaskService;
 import com.projecttaskmanager.backend.services.WorkflowService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
@@ -33,6 +37,7 @@ public class TaskServiceImpl implements TaskService {
     private final TaskStatusRepository taskStatusRepository;
     private final WorkflowService workflowService;
     private final TaskMapper taskMapper;
+    private final ActivityHelper activityHelper;
 
     @Override
     public TaskResponse create(CreateTaskRequest request) {
@@ -59,7 +64,18 @@ public class TaskServiceImpl implements TaskService {
                 .createdBy(creator)
                 .build();
 
-        return taskMapper.toResponse(taskRepository.save(task));
+        Task saved = taskRepository.save(task);
+
+        activityHelper.log(
+                ActivityAction.TASK_CREATED,
+                "TASK",
+                saved.getId(),
+                project.getId(),
+                "Created task: " + saved.getTitle(),
+                creator.getId()
+        );
+
+        return taskMapper.toResponse(saved);
     }
 
     @Override
@@ -93,13 +109,41 @@ public class TaskServiceImpl implements TaskService {
         if (request.getDueDate() != null) task.setDueDate(request.getDueDate());
         if (request.getEstimatedTime() != null) task.setEstimatedTime(request.getEstimatedTime());
 
-        return taskMapper.toResponse(taskRepository.save(task));
+        Task updated = taskRepository.save(task);
+
+        User user = userRepository.findByEmail(
+                SecurityContextHolder.getContext().getAuthentication().getName()
+        ).orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+
+        activityHelper.log(
+                ActivityAction.TASK_UPDATED,
+                "TASK",
+                updated.getId(),
+                updated.getProject().getId(),
+                "Updated task: " + updated.getTitle(),
+                user.getId()
+        );
+
+        return taskMapper.toResponse(updated);
     }
 
     @Override
     public void delete(UUID taskId) {
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new AppException(ErrorCode.TASK_NOT_FOUND));
+        User user = userRepository.findByEmail(
+                SecurityContextHolder.getContext().getAuthentication().getName()
+        ).orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+
+        activityHelper.log(
+                ActivityAction.TASK_DELETED,
+                "TASK",
+                task.getId(),
+                task.getProject().getId(),
+                "Deleted task: " + task.getTitle(),
+                user.getId()
+        );
+
         taskRepository.delete(task);
     }
 

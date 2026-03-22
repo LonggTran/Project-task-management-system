@@ -35,6 +35,7 @@ public class SecurityConfig {
                         .requestMatchers("/subtasks/**").authenticated()
                         .requestMatchers("/workflows/**").authenticated()
                         .requestMatchers("/sprints/**").authenticated()
+                        .requestMatchers("/activities/**").authenticated()
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);

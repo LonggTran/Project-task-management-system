@@ -30,6 +30,7 @@ public class ProjectRoleSeeder implements CommandLineRunner {
         Permission projectUpdate = createPermission("PROJECT_UPDATE");
         Permission projectDelete = createPermission("PROJECT_DELETE");
         Permission projectArchive = createPermission("PROJECT_ARCHIVE");
+        Permission activityView = createPermission("ACTIVITY_VIEW");
 
         // =======================
         // MEMBER PERMISSIONS
@@ -104,7 +105,7 @@ public class ProjectRoleSeeder implements CommandLineRunner {
                 sprintCreate, sprintUpdate, sprintDelete, sprintView,
                 attachmentUpload, attachmentDelete, attachmentView,
                 notificationSend, notificationView,
-                commentCreate, commentUpdate, commentDelete, commentView
+                commentCreate, commentUpdate, commentDelete, commentView, activityView
         ));
 
         // ADMIN_PROJECT → can manage project & tasks but not delete project
@@ -116,7 +117,7 @@ public class ProjectRoleSeeder implements CommandLineRunner {
                 sprintCreate, sprintUpdate, sprintDelete, sprintView,
                 attachmentUpload, attachmentDelete, attachmentView,
                 notificationSend, notificationView,
-                commentCreate, commentUpdate, commentDelete, commentView
+                commentCreate, commentUpdate, commentDelete, commentView, activityView
         ));
 
         // MEMBER → basic access
@@ -128,7 +129,7 @@ public class ProjectRoleSeeder implements CommandLineRunner {
                 sprintView,
                 attachmentUpload, attachmentView,
                 notificationView,
-                commentCreate, commentView
+                commentCreate, commentView, activityView
         ));
     }
 

@@ -1,0 +1,24 @@
+package com.projecttaskmanager.backend.models.enums;
+
+public enum ActivityAction {
+    PROJECT_CREATED,
+    PROJECT_UPDATED,
+    PROJECT_ARCHIVED,
+
+    TASK_CREATED,
+    TASK_UPDATED,
+    TASK_DELETED,
+    TASK_STATUS_CHANGED,
+    TASK_ASSIGNED,
+
+    COMMENT_CREATED,
+    COMMENT_UPDATED,
+    COMMENT_DELETED,
+
+    ATTACHMENT_UPLOADED,
+    ATTACHMENT_DELETED,
+
+    SPRINT_CREATED,
+    SPRINT_STARTED,
+    SPRINT_COMPLETED
+}

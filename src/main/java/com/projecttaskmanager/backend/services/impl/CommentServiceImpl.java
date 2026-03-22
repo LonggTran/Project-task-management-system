@@ -2,12 +2,14 @@ package com.projecttaskmanager.backend.services.impl;
 
 import com.projecttaskmanager.backend.dto.request.task.CreateCommentRequest;
 import com.projecttaskmanager.backend.dto.response.task.CommentResponse;
+import com.projecttaskmanager.backend.events.ActivityHelper;
 import com.projecttaskmanager.backend.exceptions.AppException;
 import com.projecttaskmanager.backend.exceptions.ErrorCode;
 import com.projecttaskmanager.backend.mapper.CommentMapper;
 import com.projecttaskmanager.backend.models.Comment;
 import com.projecttaskmanager.backend.models.Task;
 import com.projecttaskmanager.backend.models.User;
+import com.projecttaskmanager.backend.models.enums.ActivityAction;
 import com.projecttaskmanager.backend.repositories.CommentRepository;
 import com.projecttaskmanager.backend.repositories.TaskRepository;
 import com.projecttaskmanager.backend.repositories.UserRepository;
@@ -30,6 +32,7 @@ public class CommentServiceImpl implements CommentService {
     private final UserRepository userRepository;
     private final ProjectAuthorizationService authorizationService;
     private final CommentMapper commentMapper;
+    private final ActivityHelper activityHelper;
 
     @Override
     public CommentResponse createComment(UUID taskId, CreateCommentRequest request) {
@@ -49,6 +52,16 @@ public class CommentServiceImpl implements CommentService {
                 .build();
 
         Comment saved = commentRepository.save(comment);
+
+        activityHelper.log(
+                ActivityAction.COMMENT_CREATED,
+                "COMMENT",
+                saved.getId(),
+                task.getProject().getId(),
+                "Comment added",
+                user.getId()
+        );
+
         return commentMapper.toResponse(saved);
     }
 
@@ -62,6 +75,15 @@ public class CommentServiceImpl implements CommentService {
         comment.setContent(request.getContent());
 
         Comment saved = commentRepository.save(comment);
+
+        activityHelper.log(
+                ActivityAction.COMMENT_UPDATED,
+                "COMMENT",
+                saved.getId(),
+                comment.getTask().getProject().getId(),
+                "Comment updated",
+                comment.getUser().getId()
+        );
         return commentMapper.toResponse(saved);
     }
 
@@ -71,6 +93,15 @@ public class CommentServiceImpl implements CommentService {
                 .orElseThrow(() -> new AppException(ErrorCode.TASK_NOT_FOUND));
 
         authorizationService.checkPermission(comment.getTask().getProject().getId(), "COMMENT_DELETE");
+
+        activityHelper.log(
+                ActivityAction.COMMENT_DELETED,
+                "COMMENT",
+                comment.getId(),
+                comment.getTask().getProject().getId(),
+                "Comment deleted",
+                comment.getUser().getId()
+        );
 
         commentRepository.delete(comment);
     }
