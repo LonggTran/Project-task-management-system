@@ -3,18 +3,22 @@ package com.projecttaskmanager.backend.services.impl;
 import com.projecttaskmanager.backend.dto.request.epic.CreateEpicRequest;
 import com.projecttaskmanager.backend.dto.request.epic.UpdateEpicRequest;
 import com.projecttaskmanager.backend.dto.response.epic.EpicResponse;
+import com.projecttaskmanager.backend.events.ActivityHelper;
+import com.projecttaskmanager.backend.events.NotificationEvent;
 import com.projecttaskmanager.backend.exceptions.AppException;
 import com.projecttaskmanager.backend.exceptions.ErrorCode;
 import com.projecttaskmanager.backend.mapper.EpicMapper;
 import com.projecttaskmanager.backend.models.Epic;
 import com.projecttaskmanager.backend.models.Project;
 import com.projecttaskmanager.backend.models.User;
+import com.projecttaskmanager.backend.models.enums.ActivityAction;
 import com.projecttaskmanager.backend.repositories.EpicRepository;
 import com.projecttaskmanager.backend.repositories.ProjectRepository;
 import com.projecttaskmanager.backend.repositories.UserRepository;
 import com.projecttaskmanager.backend.services.EpicService;
 import com.projecttaskmanager.backend.services.ProjectAuthorizationService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
@@ -30,6 +34,8 @@ public class EpicServiceImpl implements EpicService {
     private final UserRepository userRepository;
     private final EpicMapper epicMapper;
     private final ProjectAuthorizationService authorizationService;
+    private final ApplicationEventPublisher eventPublisher;
+    private final ActivityHelper activityHelper;
 
     @Override
     public EpicResponse create(CreateEpicRequest request) {
@@ -50,7 +56,18 @@ public class EpicServiceImpl implements EpicService {
                 .endDate(request.getEndDate())
                 .build();
 
-        return epicMapper.toResponse(epicRepository.save(epic));
+        Epic saved = epicRepository.save(epic);
+
+        activityHelper.log(
+                ActivityAction.EPIC_CREATED,
+                "EPIC",
+                saved.getId(),
+                project.getId(),
+                "Created epic: " + saved.getName(),
+                user.getId()
+        );
+
+        return epicMapper.toResponse(saved);
     }
 
     @Override
