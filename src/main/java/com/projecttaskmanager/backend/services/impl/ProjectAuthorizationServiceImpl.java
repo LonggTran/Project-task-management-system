@@ -12,6 +12,7 @@ import com.projecttaskmanager.backend.services.ProjectAuthorizationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Arrays;
 import java.util.UUID;
@@ -50,6 +51,7 @@ public class ProjectAuthorizationServiceImpl implements ProjectAuthorizationServ
     }
 
     @Override
+    @Transactional(readOnly = true)
     public void checkPermission(UUID projectId, String permission) {
         User user = getCurrentUser();
 

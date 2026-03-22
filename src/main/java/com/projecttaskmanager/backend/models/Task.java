@@ -66,4 +66,13 @@ public class Task extends BaseEntity {
     @ManyToOne
     @JoinColumn(name = "epic_id")
     private Epic epic;
+
+    @OneToMany(mappedBy = "task", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<Comment> comments;
+
+    @OneToMany(mappedBy = "task", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<Attachment> attachments;
+
+    @OneToMany(mappedBy = "task", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<TaskAssignee> assignees;
 }

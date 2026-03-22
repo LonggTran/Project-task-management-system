@@ -2,12 +2,14 @@ package com.projecttaskmanager.backend.services.impl;
 
 import com.projecttaskmanager.backend.dto.request.task.AssignTaskRequest;
 import com.projecttaskmanager.backend.dto.response.task.TaskAssigneeResponse;
+import com.projecttaskmanager.backend.events.ActivityHelper;
 import com.projecttaskmanager.backend.exceptions.AppException;
 import com.projecttaskmanager.backend.exceptions.ErrorCode;
 import com.projecttaskmanager.backend.mapper.TaskAssigneeMapper;
 import com.projecttaskmanager.backend.models.Task;
 import com.projecttaskmanager.backend.models.TaskAssignee;
 import com.projecttaskmanager.backend.models.User;
+import com.projecttaskmanager.backend.models.enums.ActivityAction;
 import com.projecttaskmanager.backend.repositories.TaskAssigneeRepository;
 import com.projecttaskmanager.backend.repositories.TaskRepository;
 import com.projecttaskmanager.backend.repositories.UserRepository;
@@ -27,6 +29,7 @@ public class TaskAssigneeServiceImpl implements TaskAssigneeService {
     private final TaskRepository taskRepository;
     private final UserRepository userRepository;
     private final TaskAssigneeMapper mapper;
+    private final ActivityHelper activityHelper;
 
     @Override
     public TaskAssigneeResponse assignTask(AssignTaskRequest request) {
@@ -47,7 +50,18 @@ public class TaskAssigneeServiceImpl implements TaskAssigneeService {
                 .user(user)
                 .build();
 
-        return mapper.toResponse(assigneeRepository.save(assignee));
+        TaskAssignee saved = assigneeRepository.save(assignee);
+
+        activityHelper.log(
+                ActivityAction.TASK_ASSIGNED,
+                "TASK",
+                task.getId(),
+                task.getProject().getId(),
+                "Assigned user: " + user.getEmail(),
+                user.getId()
+        );
+
+        return mapper.toResponse(saved);
     }
 
     @Override
@@ -86,6 +100,15 @@ public class TaskAssigneeServiceImpl implements TaskAssigneeService {
                 .orElseThrow(() -> new AppException(ErrorCode.VALIDATION_ERROR));
 
         assigneeRepository.delete(assignee);
+
+        activityHelper.log(
+                ActivityAction.TASK_UPDATED,
+                "TASK",
+                task.getId(),
+                task.getProject().getId(),
+                "Unassigned user: " + user.getEmail(),
+                user.getId()
+        );
     }
 
     @Override

@@ -4,11 +4,13 @@ import com.projecttaskmanager.backend.dto.request.sprint.AddTaskToSprintRequest;
 import com.projecttaskmanager.backend.dto.request.sprint.CreateSprintRequest;
 import com.projecttaskmanager.backend.dto.response.sprint.SprintResponse;
 import com.projecttaskmanager.backend.dto.response.sprint.SprintTaskResponse;
+import com.projecttaskmanager.backend.events.ActivityHelper;
 import com.projecttaskmanager.backend.exceptions.AppException;
 import com.projecttaskmanager.backend.exceptions.ErrorCode;
 import com.projecttaskmanager.backend.mapper.SprintMapper;
 import com.projecttaskmanager.backend.mapper.SprintTaskMapper;
 import com.projecttaskmanager.backend.models.*;
+import com.projecttaskmanager.backend.models.enums.ActivityAction;
 import com.projecttaskmanager.backend.models.enums.SprintStatus;
 import com.projecttaskmanager.backend.repositories.*;
 import com.projecttaskmanager.backend.services.ProjectAuthorizationService;
@@ -30,6 +32,7 @@ public class SprintServiceImpl implements SprintService {
     private final SprintMapper sprintMapper;
     private final SprintTaskMapper sprintTaskMapper;
     private final ProjectAuthorizationService auth;
+    private final ActivityHelper activityHelper;
 
     @Override
     public SprintResponse create(CreateSprintRequest request) {
@@ -47,7 +50,18 @@ public class SprintServiceImpl implements SprintService {
                 .project(project)
                 .build();
 
-        return sprintMapper.toResponse(sprintRepository.save(sprint));
+        Sprint saved = sprintRepository.save(sprint);
+
+        activityHelper.log(
+                ActivityAction.SPRINT_CREATED,
+                "SPRINT",
+                saved.getId(),
+                project.getId(),
+                "Created sprint: " + saved.getName(),
+                null
+        );
+
+        return sprintMapper.toResponse(saved);
     }
 
     @Override
@@ -59,6 +73,15 @@ public class SprintServiceImpl implements SprintService {
         auth.checkPermission(sprint.getProject().getId(), "SPRINT_UPDATE");
 
         sprint.setStatus(SprintStatus.ACTIVE);
+
+        activityHelper.log(
+                ActivityAction.SPRINT_STARTED,
+                "SPRINT",
+                sprint.getId(),
+                sprint.getProject().getId(),
+                "Sprint started",
+                null
+        );
 
         return sprintMapper.toResponse(sprintRepository.save(sprint));
     }
@@ -72,6 +95,15 @@ public class SprintServiceImpl implements SprintService {
         auth.checkPermission(sprint.getProject().getId(), "SPRINT_UPDATE");
 
         sprint.setStatus(SprintStatus.CLOSED);
+
+        activityHelper.log(
+                ActivityAction.SPRINT_COMPLETED,
+                "SPRINT",
+                sprint.getId(),
+                sprint.getProject().getId(),
+                "Sprint completed",
+                null
+        );
 
         return sprintMapper.toResponse(sprintRepository.save(sprint));
     }
