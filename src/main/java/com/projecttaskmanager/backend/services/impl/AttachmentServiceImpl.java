@@ -7,17 +7,21 @@ import com.projecttaskmanager.backend.exceptions.ErrorCode;
 import com.projecttaskmanager.backend.mapper.AttachmentMapper;
 import com.projecttaskmanager.backend.models.Attachment;
 import com.projecttaskmanager.backend.models.Task;
+import com.projecttaskmanager.backend.models.TaskAssignee;
 import com.projecttaskmanager.backend.models.User;
 import com.projecttaskmanager.backend.models.enums.ActivityAction;
 import com.projecttaskmanager.backend.repositories.AttachmentRepository;
+import com.projecttaskmanager.backend.repositories.TaskAssigneeRepository;
 import com.projecttaskmanager.backend.repositories.TaskRepository;
 import com.projecttaskmanager.backend.repositories.UserRepository;
 import com.projecttaskmanager.backend.services.AttachmentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+import com.projecttaskmanager.backend.events.NotificationEvent;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -36,6 +40,8 @@ public class AttachmentServiceImpl implements AttachmentService {
     private final UserRepository userRepository;
     private final AttachmentMapper attachmentMapper;
     private final ActivityHelper activityHelper;
+    private final ApplicationEventPublisher eventPublisher; // Thêm field này
+    private final TaskAssigneeRepository taskAssigneeRepository;
 
     @Value("${file.upload-dir:uploads}")
     private String uploadDir;
@@ -80,6 +86,28 @@ public class AttachmentServiceImpl implements AttachmentService {
                     .build();
 
             Attachment saved = attachmentRepository.save(attachment);
+
+            // Thông báo cho người được gán task
+            List<User> assignees = taskAssigneeRepository.findByTask(task)
+                    .stream()
+                    .map(TaskAssignee::getUser)
+                    .filter(assignee -> !assignee.getId().equals(user.getId())) // Không thông báo cho người upload
+                    .toList();
+
+            for (User assignee : assignees) {
+                eventPublisher.publishEvent(
+                        NotificationEvent.builder()
+                                .receiverId(assignee.getId())
+                                .projectId(task.getProject().getId())
+                                .title("Tệp đính kèm mới")
+                                .content(String.format("%s đã đính kèm tệp vào task: %s",
+                                        user.getFullName(), task.getTitle()))
+                                .type("ATTACHMENT_ADDED")
+                                .referenceId(task.getId())
+                                .actorId(user.getId())
+                                .build()
+                );
+            }
 
             activityHelper.log(
                     ActivityAction.ATTACHMENT_UPLOADED,

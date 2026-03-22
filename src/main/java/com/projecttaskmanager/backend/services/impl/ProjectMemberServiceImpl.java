@@ -17,7 +17,10 @@ import com.projecttaskmanager.backend.repositories.UserRepository;
 import com.projecttaskmanager.backend.services.ProjectAuthorizationService;
 import com.projecttaskmanager.backend.services.ProjectMemberService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import com.projecttaskmanager.backend.events.NotificationEvent;
 
 import java.time.Instant;
 import java.util.List;
@@ -33,6 +36,13 @@ public class ProjectMemberServiceImpl implements ProjectMemberService {
     private final ProjectRoleRepository projectRoleRepository;
     private final ProjectAuthorizationService authorizationService;
     private final ProjectMemberMapper projectMemberMapper;
+    private final ApplicationEventPublisher eventPublisher;
+
+    private User getCurrentUser() {
+        return userRepository.findByEmail(
+                SecurityContextHolder.getContext().getAuthentication().getName()
+        ).orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+    }
 
     @Override
     public ProjectMemberResponse addMember(UUID projectId, AddMemberRequest request) {
@@ -46,6 +56,8 @@ public class ProjectMemberServiceImpl implements ProjectMemberService {
 
         ProjectRole role = projectRoleRepository.findByName(request.getProjectRole())
                 .orElseThrow(() -> new AppException(ErrorCode.VALIDATION_ERROR));
+
+        User currentUser = getCurrentUser();
 
         boolean exists = projectMemberRepository
                 .findByProjectAndUser(project, user)
@@ -64,6 +76,19 @@ public class ProjectMemberServiceImpl implements ProjectMemberService {
                 .build();
 
         ProjectMember saved = projectMemberRepository.save(member);
+
+        eventPublisher.publishEvent(
+                NotificationEvent.builder()
+                        .receiverId(user.getId())
+                        .projectId(project.getId())
+                        .title("Được thêm vào dự án")
+                        .content(String.format("Bạn đã được %s thêm vào dự án '%s'",
+                                currentUser.getFullName(), project.getName()))
+                        .type("PROJECT_MEMBER_ADDED")
+                        .referenceId(project.getId())
+                        .actorId(currentUser.getId())
+                        .build()
+        );
 
         return projectMemberMapper.toResponse(saved);
     }
