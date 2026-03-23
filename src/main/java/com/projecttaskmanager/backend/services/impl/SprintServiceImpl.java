@@ -16,7 +16,9 @@ import com.projecttaskmanager.backend.repositories.*;
 import com.projecttaskmanager.backend.services.ProjectAuthorizationService;
 import com.projecttaskmanager.backend.services.SprintService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
+import com.projecttaskmanager.backend.events.NotificationEvent;
 
 import java.util.List;
 import java.util.UUID;
@@ -33,6 +35,7 @@ public class SprintServiceImpl implements SprintService {
     private final SprintTaskMapper sprintTaskMapper;
     private final ProjectAuthorizationService auth;
     private final ActivityHelper activityHelper;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Override
     public SprintResponse create(CreateSprintRequest request) {
@@ -51,6 +54,16 @@ public class SprintServiceImpl implements SprintService {
                 .build();
 
         Sprint saved = sprintRepository.save(sprint);
+
+        eventPublisher.publishEvent(
+                NotificationEvent.builder()
+                        .projectId(sprint.getProject().getId())
+                        .title("Sprint đã bắt đầu")
+                        .content(String.format("Sprint '%s' đã bắt đầu", sprint.getName()))
+                        .type("SPRINT_STARTED")
+                        .referenceId(sprint.getId())
+                        .build()
+        );
 
         activityHelper.log(
                 ActivityAction.SPRINT_CREATED,
@@ -73,6 +86,16 @@ public class SprintServiceImpl implements SprintService {
         auth.checkPermission(sprint.getProject().getId(), "SPRINT_UPDATE");
 
         sprint.setStatus(SprintStatus.ACTIVE);
+
+        eventPublisher.publishEvent(
+                NotificationEvent.builder()
+                        .projectId(sprint.getProject().getId())
+                        .title("Sprint đã kết thúc")
+                        .content(String.format("Sprint '%s' đã kết thúc", sprint.getName()))
+                        .type("SPRINT_COMPLETED")
+                        .referenceId(sprint.getId())
+                        .build()
+        );
 
         activityHelper.log(
                 ActivityAction.SPRINT_STARTED,

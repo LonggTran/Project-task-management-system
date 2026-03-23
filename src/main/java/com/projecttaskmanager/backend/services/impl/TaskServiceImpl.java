@@ -3,7 +3,7 @@ package com.projecttaskmanager.backend.services.impl;
 import com.projecttaskmanager.backend.dto.request.task.CreateTaskRequest;
 import com.projecttaskmanager.backend.dto.request.task.UpdateTaskRequest;
 import com.projecttaskmanager.backend.dto.response.task.TaskResponse;
-import com.projecttaskmanager.backend.events.ActivityEvent;
+import com.projecttaskmanager.backend.events.NotificationEvent;
 import com.projecttaskmanager.backend.events.ActivityHelper;
 import com.projecttaskmanager.backend.exceptions.AppException;
 import com.projecttaskmanager.backend.exceptions.ErrorCode;
@@ -38,6 +38,13 @@ public class TaskServiceImpl implements TaskService {
     private final WorkflowService workflowService;
     private final TaskMapper taskMapper;
     private final ActivityHelper activityHelper;
+    private final ApplicationEventPublisher eventPublisher;
+
+    private User getCurrentUser() {
+        return userRepository.findByEmail(
+                SecurityContextHolder.getContext().getAuthentication().getName()
+        ).orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+    }
 
     @Override
     public TaskResponse create(CreateTaskRequest request) {
@@ -84,6 +91,8 @@ public class TaskServiceImpl implements TaskService {
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new AppException(ErrorCode.TASK_NOT_FOUND));
 
+        TaskStatus oldStatus = task.getStatus();
+
         if (request.getTitle() != null) task.setTitle(request.getTitle());
         if (request.getDescription() != null) task.setDescription(request.getDescription());
 //        if (request.getStatusId() != null) {
@@ -103,6 +112,21 @@ public class TaskServiceImpl implements TaskService {
             );
 
             task.setStatus(newStatus);
+
+            if (!oldStatus.getId().equals(newStatus.getId())) {
+                User currentUser = getCurrentUser();
+                eventPublisher.publishEvent(
+                        NotificationEvent.builder()
+                                .projectId(task.getProject().getId())
+                                .title("Thay đổi trạng thái task")
+                                .content(String.format("Task '%s' đã được %s thay đổi trạng thái từ %s sang %s",
+                                        task.getTitle(), currentUser.getFullName(), oldStatus.getName(), newStatus.getName()))
+                                .type("TASK_STATUS_CHANGED")
+                                .referenceId(task.getId())
+                                .actorId(currentUser.getId())
+                                .build()
+                );
+            }
         }
         if (request.getPriority() != null) task.setPriority(request.getPriority());
         if (request.getType() != null) task.setType(request.getType());

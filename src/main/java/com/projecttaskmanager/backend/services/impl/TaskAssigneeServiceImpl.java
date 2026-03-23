@@ -15,8 +15,10 @@ import com.projecttaskmanager.backend.repositories.TaskRepository;
 import com.projecttaskmanager.backend.repositories.UserRepository;
 import com.projecttaskmanager.backend.services.TaskAssigneeService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import com.projecttaskmanager.backend.events.NotificationEvent;
 
 import java.util.List;
 import java.util.UUID;
@@ -30,6 +32,13 @@ public class TaskAssigneeServiceImpl implements TaskAssigneeService {
     private final UserRepository userRepository;
     private final TaskAssigneeMapper mapper;
     private final ActivityHelper activityHelper;
+    private final ApplicationEventPublisher eventPublisher;
+
+    private User getCurrentUser() {
+        return userRepository.findByEmail(
+                SecurityContextHolder.getContext().getAuthentication().getName()
+        ).orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+    }
 
     @Override
     public TaskAssigneeResponse assignTask(AssignTaskRequest request) {
@@ -39,6 +48,8 @@ public class TaskAssigneeServiceImpl implements TaskAssigneeService {
 
         User user = userRepository.findById(request.getUserId())
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+
+        User currentUser = getCurrentUser();
 
         // kiểm tra đã gán chưa
         assigneeRepository.findByTaskAndUser(task, user).ifPresent(a -> {
@@ -51,6 +62,19 @@ public class TaskAssigneeServiceImpl implements TaskAssigneeService {
                 .build();
 
         TaskAssignee saved = assigneeRepository.save(assignee);
+
+        eventPublisher.publishEvent(
+                NotificationEvent.builder()
+                        .receiverId(user.getId())
+                        .projectId(task.getProject().getId())
+                        .title("Được gán task mới")
+                        .content(String.format("Bạn đã được %s gán vào task: %s",
+                                currentUser.getFullName(), task.getTitle()))
+                        .type("TASK_ASSIGNED")
+                        .referenceId(task.getId())
+                        .actorId(currentUser.getId())
+                        .build()
+        );
 
         activityHelper.log(
                 ActivityAction.TASK_ASSIGNED,

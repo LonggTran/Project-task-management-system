@@ -8,16 +8,20 @@ import com.projecttaskmanager.backend.exceptions.ErrorCode;
 import com.projecttaskmanager.backend.mapper.CommentMapper;
 import com.projecttaskmanager.backend.models.Comment;
 import com.projecttaskmanager.backend.models.Task;
+import com.projecttaskmanager.backend.models.TaskAssignee;
 import com.projecttaskmanager.backend.models.User;
 import com.projecttaskmanager.backend.models.enums.ActivityAction;
 import com.projecttaskmanager.backend.repositories.CommentRepository;
+import com.projecttaskmanager.backend.repositories.TaskAssigneeRepository;
 import com.projecttaskmanager.backend.repositories.TaskRepository;
 import com.projecttaskmanager.backend.repositories.UserRepository;
 import com.projecttaskmanager.backend.services.CommentService;
 import com.projecttaskmanager.backend.services.ProjectAuthorizationService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import com.projecttaskmanager.backend.events.NotificationEvent;
 
 import java.util.List;
 import java.util.UUID;
@@ -33,6 +37,8 @@ public class CommentServiceImpl implements CommentService {
     private final ProjectAuthorizationService authorizationService;
     private final CommentMapper commentMapper;
     private final ActivityHelper activityHelper;
+    private final ApplicationEventPublisher eventPublisher; // Thêm field này
+    private final TaskAssigneeRepository taskAssigneeRepository;
 
     @Override
     public CommentResponse createComment(UUID taskId, CreateCommentRequest request) {
@@ -52,6 +58,27 @@ public class CommentServiceImpl implements CommentService {
                 .build();
 
         Comment saved = commentRepository.save(comment);
+
+//        List<User> assignees = taskAssigneeRepository.findByTask(task)
+//                .stream()
+//                .map(TaskAssignee::getUser)
+//                .filter(assignee -> !assignee.getId().equals(user.getId())) // Không thông báo cho người comment
+//                .toList();
+//
+//        for (User assignee : assignees) {
+//            eventPublisher.publishEvent(
+//                    NotificationEvent.builder()
+//                            .receiverId(assignee.getId())
+//                            .projectId(task.getProject().getId())
+//                            .title("Bình luận mới")
+//                            .content(String.format("%s đã bình luận về task: %s",
+//                                    user.getFullName(), task.getTitle()))
+//                            .type("COMMENT_ADDED")
+//                            .referenceId(task.getId())
+//                            .actorId(user.getId())
+//                            .build()
+//            );
+//        }
 
         activityHelper.log(
                 ActivityAction.COMMENT_CREATED,
