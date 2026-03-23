@@ -1,5 +1,6 @@
 package com.projecttaskmanager.backend.services.impl;
 
+import com.projecttaskmanager.backend.config.ProjectStatusSeeder;
 import com.projecttaskmanager.backend.dto.request.project.CreateProjectRequest;
 import com.projecttaskmanager.backend.dto.request.project.UpdateProjectRequest;
 import com.projecttaskmanager.backend.dto.response.project.ProjectResponse;
@@ -36,6 +37,7 @@ public class ProjectServiceImpl implements ProjectService {
     private final ProjectRoleRepository projectRoleRepository;
     private final ProjectAuthorizationService authorizationService;
     private final ProjectMapper projectMapper;
+    private final ProjectStatusSeeder projectStatusSeeder;
 
     @Override
     public ProjectResponse createProject(CreateProjectRequest request) {
@@ -69,7 +71,7 @@ public class ProjectServiceImpl implements ProjectService {
                 .build();
 
         projectMemberRepository.save(owner);
-
+        projectStatusSeeder.seedDefaultStatusesForProject(project);
         return projectMapper.toResponse(project);
     }
 

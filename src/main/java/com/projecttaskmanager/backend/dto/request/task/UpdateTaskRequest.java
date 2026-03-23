@@ -16,4 +16,6 @@ public class UpdateTaskRequest {
     private TaskType type;
     private LocalDate dueDate;
     private Integer estimatedTime;
+    private UUID epicId;
+    private UUID parentTaskId;
 }

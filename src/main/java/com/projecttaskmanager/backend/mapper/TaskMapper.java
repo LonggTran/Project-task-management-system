@@ -25,6 +25,8 @@ public class TaskMapper {
                 .dueDate(task.getDueDate())
                 .estimatedTime(task.getEstimatedTime())
                 .createdBy(userMapper.toResponse(task.getCreatedBy()))
+                .epicId(task.getEpic() != null ? task.getEpic().getId() : null)  // THÊM DÒNG NÀY
+                .parentTaskId(task.getParentTask() != null ? task.getParentTask().getId() : null)
                 .build();
     }
 }

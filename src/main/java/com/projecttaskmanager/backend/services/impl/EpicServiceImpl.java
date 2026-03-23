@@ -70,9 +70,9 @@ public class EpicServiceImpl implements EpicService {
         return epicMapper.toResponse(saved);
     }
 
+    // services/impl/EpicServiceImpl.java - Đảm bảo update hoạt động
     @Override
     public EpicResponse update(UUID epicId, UpdateEpicRequest request) {
-
         Epic epic = getEpic(epicId);
 
         authorizationService.checkPermission(epic.getProject().getId(), "EPIC_UPDATE");
@@ -82,7 +82,19 @@ public class EpicServiceImpl implements EpicService {
         if (request.getStartDate() != null) epic.setStartDate(request.getStartDate());
         if (request.getEndDate() != null) epic.setEndDate(request.getEndDate());
 
-        return epicMapper.toResponse(epicRepository.save(epic));
+        Epic saved = epicRepository.save(epic);
+
+        // Log activity
+        activityHelper.log(
+                ActivityAction.EPIC_UPDATED,
+                "EPIC",
+                saved.getId(),
+                epic.getProject().getId(),
+                "Updated epic: " + saved.getName(),
+                getCurrentUser().getId()
+        );
+
+        return epicMapper.toResponse(saved);
     }
 
     @Override

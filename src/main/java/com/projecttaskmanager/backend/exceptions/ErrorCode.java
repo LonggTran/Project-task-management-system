@@ -21,7 +21,13 @@ public enum ErrorCode {
 
     EMAIL_ALREADY_EXISTS("EMAIL_ALREADY_EXISTS", "Email already exists"),
 
-    USER_ALREADY_IN_PROJECT("USER_ALREADY_IN_PROJECT", "User already in project");
+    USER_ALREADY_IN_PROJECT("USER_ALREADY_IN_PROJECT", "User already in project"),
+
+    INVALID_INVITATION("INVALID_INVITATION", "Invalid invitation token"),
+
+    INVITATION_ALREADY_ACCEPTED("INVITATION_ALREADY_ACCEPTED", "Invitation already accepted"),
+
+    INVITATION_EXPIRED("INVITATION_EXPIRED", "Invitation has expired");
 
     private final String code;
 
