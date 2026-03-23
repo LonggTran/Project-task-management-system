@@ -22,5 +22,7 @@ public enum ActivityAction {
     SPRINT_STARTED,
     SPRINT_COMPLETED,
 
-    EPIC_CREATED
+    EPIC_CREATED,
+    EPIC_UPDATED,
+    EPIC_DELETED
 }

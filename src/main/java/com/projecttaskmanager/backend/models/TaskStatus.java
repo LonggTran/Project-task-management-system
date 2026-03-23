@@ -26,4 +26,8 @@ public class TaskStatus {
     private Boolean isDefault;
 
     private Integer sort;
+
+    @ManyToOne
+    @JoinColumn(name = "project_id")
+    private Project project;
 }

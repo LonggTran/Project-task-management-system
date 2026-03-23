@@ -1,3 +1,4 @@
+// mapper/TaskStatusMapper.java
 package com.projecttaskmanager.backend.mapper;
 
 import com.projecttaskmanager.backend.dto.response.task.TaskStatusResponse;
@@ -15,6 +16,7 @@ public class TaskStatusMapper {
                 .name(status.getName())
                 .category(status.getCategory())
                 .isDefault(status.getIsDefault())
+                .order(status.getSort())
                 .build();
     }
 }

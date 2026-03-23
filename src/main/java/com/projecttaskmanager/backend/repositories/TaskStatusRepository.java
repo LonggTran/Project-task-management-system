@@ -1,15 +1,18 @@
+// repositories/TaskStatusRepository.java
 package com.projecttaskmanager.backend.repositories;
 
+import com.projecttaskmanager.backend.models.Project;
 import com.projecttaskmanager.backend.models.TaskStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-@Repository
 public interface TaskStatusRepository extends JpaRepository<TaskStatus, UUID> {
-    Optional<TaskStatus> findByIsDefaultTrue();
     List<TaskStatus> findAllByOrderBySortAsc();
+    List<TaskStatus> findByProjectOrderBySortAsc(Project project);
+    Optional<TaskStatus> findByNameAndProject(String name, Project project);
+    Optional<TaskStatus> findByIsDefaultTrueAndProject(Project project);
+    Optional<TaskStatus> findByIdAndProject(UUID id, Project project);
 }

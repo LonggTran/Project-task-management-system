@@ -47,4 +47,18 @@ public class ProjectMemberController {
                 .timestamp(Instant.now())
                 .build();
     }
+
+    @PostMapping("/invite")
+    public ApiResponse<Void> inviteMember(
+            @PathVariable UUID projectId,
+            @RequestBody AddMemberRequest request
+    ) {
+        projectMemberService.inviteMember(projectId, request);
+
+        return ApiResponse.<Void>builder()
+                .success(true)
+                .message("Invitation sent")
+                .timestamp(Instant.now())
+                .build();
+    }
 }

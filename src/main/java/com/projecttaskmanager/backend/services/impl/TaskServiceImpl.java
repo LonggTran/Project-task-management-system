@@ -8,15 +8,9 @@ import com.projecttaskmanager.backend.events.ActivityHelper;
 import com.projecttaskmanager.backend.exceptions.AppException;
 import com.projecttaskmanager.backend.exceptions.ErrorCode;
 import com.projecttaskmanager.backend.mapper.TaskMapper;
-import com.projecttaskmanager.backend.models.Project;
-import com.projecttaskmanager.backend.models.Task;
-import com.projecttaskmanager.backend.models.TaskStatus;
-import com.projecttaskmanager.backend.models.User;
+import com.projecttaskmanager.backend.models.*;
 import com.projecttaskmanager.backend.models.enums.ActivityAction;
-import com.projecttaskmanager.backend.repositories.ProjectRepository;
-import com.projecttaskmanager.backend.repositories.TaskRepository;
-import com.projecttaskmanager.backend.repositories.TaskStatusRepository;
-import com.projecttaskmanager.backend.repositories.UserRepository;
+import com.projecttaskmanager.backend.repositories.*;
 import com.projecttaskmanager.backend.services.TaskService;
 import com.projecttaskmanager.backend.services.WorkflowService;
 import lombok.RequiredArgsConstructor;
@@ -39,6 +33,7 @@ public class TaskServiceImpl implements TaskService {
     private final TaskMapper taskMapper;
     private final ActivityHelper activityHelper;
     private final ApplicationEventPublisher eventPublisher;
+    private final EpicRepository epicRepository;
 
     private User getCurrentUser() {
         return userRepository.findByEmail(
@@ -127,6 +122,21 @@ public class TaskServiceImpl implements TaskService {
                                 .build()
                 );
             }
+        }
+
+        if (request.getEpicId() != null) {
+            Epic epic = epicRepository.findById(request.getEpicId())
+                    .orElseThrow(() -> new AppException(ErrorCode.PROJECT_NOT_FOUND));
+            task.setEpic(epic);
+        } else if (request.getEpicId() == null && request.getEpicId() != null) {
+            // Nếu muốn xóa epic khỏi task
+            task.setEpic(null);
+        }
+
+        if (request.getParentTaskId() != null) {
+            Task parentTask = taskRepository.findById(request.getParentTaskId())
+                    .orElseThrow(() -> new AppException(ErrorCode.TASK_NOT_FOUND));
+            task.setParentTask(parentTask);
         }
         if (request.getPriority() != null) task.setPriority(request.getPriority());
         if (request.getType() != null) task.setType(request.getType());

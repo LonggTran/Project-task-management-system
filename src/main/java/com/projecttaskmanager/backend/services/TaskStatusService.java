@@ -1,3 +1,4 @@
+// services/TaskStatusService.java
 package com.projecttaskmanager.backend.services;
 
 import com.projecttaskmanager.backend.dto.request.task.CreateTaskStatusRequest;
@@ -8,9 +9,11 @@ import java.util.List;
 import java.util.UUID;
 
 public interface TaskStatusService {
-    TaskStatusResponse create(CreateTaskStatusRequest request);
+    TaskStatusResponse create(UUID projectId, CreateTaskStatusRequest request);
     TaskStatusResponse update(UUID id, UpdateTaskStatusRequest request);
     void delete(UUID id);
     TaskStatusResponse getById(UUID id);
+    List<TaskStatusResponse> getByProject(UUID projectId);
     List<TaskStatusResponse> getAll();
+    TaskStatusResponse getDefaultStatus(UUID projectId);
 }

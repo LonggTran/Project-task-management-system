@@ -12,4 +12,7 @@ public interface ProjectMemberService {
     void removeMember(UUID projectId, UUID userId);
     List<ProjectMemberResponse> getMembers(UUID projectId);
     void updateMemberRole(UUID projectId, UUID userId, String role);
+    void inviteMember(UUID projectId, AddMemberRequest request);
+
+    void acceptInvitation(String token);
 }

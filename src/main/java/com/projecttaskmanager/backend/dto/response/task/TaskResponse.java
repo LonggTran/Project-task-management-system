@@ -22,4 +22,6 @@ public class TaskResponse {
     private UUID projectId;
     private TaskStatusResponse status;
     private UserResponse createdBy;
+    private UUID epicId;
+    private UUID parentTaskId;
 }

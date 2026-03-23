@@ -4,10 +4,16 @@ import com.projecttaskmanager.backend.dto.response.ApiResponse;
 import com.projecttaskmanager.backend.dto.response.attachment.AttachmentResponse;
 import com.projecttaskmanager.backend.services.AttachmentService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -54,5 +60,33 @@ public class AttachmentController {
                 .message("Deleted")
                 .timestamp(Instant.now())
                 .build());
+    }
+
+    @GetMapping("/download")
+    public ResponseEntity<Resource> downloadFile(@RequestParam String path) {
+        try {
+            String decodedPath = java.net.URLDecoder.decode(path, "UTF-8");
+
+            Path filePath = Paths.get(decodedPath).toAbsolutePath().normalize();
+            Resource resource = new UrlResource(filePath.toUri());
+
+            if (resource.exists() && resource.isReadable()) {
+                String contentType = "application/octet-stream";
+                String fileName = filePath.getFileName().toString();
+                // Loại bỏ UUID prefix để lấy tên gốc
+                String originalFileName = fileName.substring(fileName.indexOf('_') + 1);
+
+                return ResponseEntity.ok()
+                        .contentType(MediaType.parseMediaType(contentType))
+                        .header(HttpHeaders.CONTENT_DISPOSITION,
+                                "attachment; filename=\"" + originalFileName + "\"")
+                        .body(resource);
+            } else {
+                return ResponseEntity.notFound().build();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.internalServerError().build();
+        }
     }
 }
