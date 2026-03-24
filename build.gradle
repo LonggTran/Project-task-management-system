@@ -52,6 +52,8 @@ dependencies {
 
     // Mail (send email)
     implementation 'org.springframework.boot:spring-boot-starter-mail'
+
+    implementation 'com.google.api-client:google-api-client:2.2.0'
 }
 
 tasks.named('test') {
