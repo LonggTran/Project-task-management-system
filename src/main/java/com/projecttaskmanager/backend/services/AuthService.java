@@ -7,4 +7,5 @@ import com.projecttaskmanager.backend.dto.response.auth.AuthResponse;
 public interface AuthService {
     AuthResponse register(RegisterRequest request);
     AuthResponse login(LoginRequest request);
+    AuthResponse loginWithGoogle(String idToken);
 }

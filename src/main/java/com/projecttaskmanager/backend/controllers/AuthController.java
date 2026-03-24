@@ -1,5 +1,6 @@
 package com.projecttaskmanager.backend.controllers;
 
+import com.projecttaskmanager.backend.dto.request.auth.GoogleLoginRequest;
 import com.projecttaskmanager.backend.dto.request.auth.LoginRequest;
 import com.projecttaskmanager.backend.dto.request.auth.RegisterRequest;
 import com.projecttaskmanager.backend.dto.response.ApiResponse;
@@ -33,6 +34,18 @@ public class AuthController {
                 .success(true)
                 .message("Login success")
                 .data(authService.login(request))
+                .timestamp(Instant.now())
+                .build();
+    }
+
+    @PostMapping("/google")
+    public ApiResponse<AuthResponse> loginWithGoogle(
+            @RequestBody GoogleLoginRequest request
+    ) {
+        return ApiResponse.<AuthResponse>builder()
+                .success(true)
+                .message("Google login success")
+                .data(authService.loginWithGoogle(request.getIdToken()))
                 .timestamp(Instant.now())
                 .build();
     }

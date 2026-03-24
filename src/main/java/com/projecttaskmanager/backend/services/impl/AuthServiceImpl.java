@@ -15,7 +15,13 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
-import java.time.Instant;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
+import com.google.api.client.http.javanet.NetHttpTransport;
+import com.google.api.client.json.gson.GsonFactory;
+import org.springframework.beans.factory.annotation.Value;
+
+import java.util.List;
 import java.util.Set;
 
 @Service
@@ -26,6 +32,9 @@ public class AuthServiceImpl implements AuthService {
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+
+    @Value("${google.client-id}")
+    private String googleClientId;
 
     @Override
     public AuthResponse register(RegisterRequest request) {
@@ -76,5 +85,59 @@ public class AuthServiceImpl implements AuthService {
                 .accessToken(accessToken)
                 .refreshToken(refreshToken)
                 .build();
+    }
+
+    @Override
+    public AuthResponse loginWithGoogle(String idTokenString) {
+
+        try {
+            GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(
+                    new NetHttpTransport(),
+                    GsonFactory.getDefaultInstance()
+            )
+                    .setAudience(List.of(googleClientId))
+                    .build();
+
+            GoogleIdToken idToken = verifier.verify(idTokenString);
+
+            if (idToken == null) {
+                throw new AppException(ErrorCode.UNAUTHORIZED);
+            }
+
+            GoogleIdToken.Payload payload = idToken.getPayload();
+
+            String email = payload.getEmail();
+            String fullName = (String) payload.get("name");
+
+            User user = userRepository.findByEmail(email).orElse(null);
+
+            if (user == null) {
+                Role userRole = roleRepository.findByName("USER")
+                        .orElseThrow(() -> new AppException(ErrorCode.FORBIDDEN));
+
+                user = User.builder()
+                        .email(email)
+                        .fullName(fullName)
+                        .password("")
+                        .isActive(true)
+                        .roles(Set.of(userRole))
+                        .build();
+
+                userRepository.save(user);
+            }
+
+            String accessToken = jwtService.generateAccessToken(user);
+            String refreshToken = jwtService.generateRefreshToken(user);
+
+            return AuthResponse.builder()
+                    .email(user.getEmail())
+                    .fullName(user.getFullName())
+                    .accessToken(accessToken)
+                    .refreshToken(refreshToken)
+                    .build();
+
+        } catch (Exception e) {
+            throw new AppException(ErrorCode.UNAUTHORIZED);
+        }
     }
 }
