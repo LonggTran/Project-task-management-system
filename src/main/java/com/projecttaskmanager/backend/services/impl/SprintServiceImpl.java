@@ -55,16 +55,6 @@ public class SprintServiceImpl implements SprintService {
 
         Sprint saved = sprintRepository.save(sprint);
 
-        eventPublisher.publishEvent(
-                NotificationEvent.builder()
-                        .projectId(sprint.getProject().getId())
-                        .title("Sprint đã bắt đầu")
-                        .content(String.format("Sprint '%s' đã bắt đầu", sprint.getName()))
-                        .type("SPRINT_STARTED")
-                        .referenceId(sprint.getId())
-                        .build()
-        );
-
         activityHelper.log(
                 ActivityAction.SPRINT_CREATED,
                 "SPRINT",
@@ -90,9 +80,9 @@ public class SprintServiceImpl implements SprintService {
         eventPublisher.publishEvent(
                 NotificationEvent.builder()
                         .projectId(sprint.getProject().getId())
-                        .title("Sprint đã kết thúc")
-                        .content(String.format("Sprint '%s' đã kết thúc", sprint.getName()))
-                        .type("SPRINT_COMPLETED")
+                        .title("Sprint đã khởi động")
+                        .content(String.format("Sprint '%s' đã khởi động", sprint.getName()))
+                        .type("SPRINT_STARTED")
                         .referenceId(sprint.getId())
                         .build()
         );
@@ -118,6 +108,16 @@ public class SprintServiceImpl implements SprintService {
         auth.checkPermission(sprint.getProject().getId(), "SPRINT_UPDATE");
 
         sprint.setStatus(SprintStatus.CLOSED);
+
+        eventPublisher.publishEvent(
+                NotificationEvent.builder()
+                        .projectId(sprint.getProject().getId())
+                        .title("Sprint đã kết thúc")
+                        .content(String.format("Sprint '%s' đã kết thúc", sprint.getName()))
+                        .type("SPRINT_COMPLETED")
+                        .referenceId(sprint.getId())
+                        .build()
+        );
 
         activityHelper.log(
                 ActivityAction.SPRINT_COMPLETED,
@@ -184,6 +184,19 @@ public class SprintServiceImpl implements SprintService {
         return sprintRepository.findByProject(project)
                 .stream()
                 .map(sprintMapper::toResponse)
+                .toList();
+    }
+
+    @Override
+    public List<SprintTaskResponse> getSprintTasks(UUID sprintId) {
+        Sprint sprint = sprintRepository.findById(sprintId)
+                .orElseThrow(() -> new AppException(ErrorCode.PROJECT_NOT_FOUND));
+
+        auth.checkPermission(sprint.getProject().getId(), "SPRINT_VIEW");
+
+        return sprintTaskRepository.findBySprint(sprint)
+                .stream()
+                .map(sprintTaskMapper::toResponse)
                 .toList();
     }
 }

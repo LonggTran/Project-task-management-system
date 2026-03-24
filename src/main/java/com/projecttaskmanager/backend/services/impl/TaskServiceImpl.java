@@ -2,11 +2,13 @@ package com.projecttaskmanager.backend.services.impl;
 
 import com.projecttaskmanager.backend.dto.request.task.CreateTaskRequest;
 import com.projecttaskmanager.backend.dto.request.task.UpdateTaskRequest;
+import com.projecttaskmanager.backend.dto.response.label.LabelResponse;
 import com.projecttaskmanager.backend.dto.response.task.TaskResponse;
 import com.projecttaskmanager.backend.events.NotificationEvent;
 import com.projecttaskmanager.backend.events.ActivityHelper;
 import com.projecttaskmanager.backend.exceptions.AppException;
 import com.projecttaskmanager.backend.exceptions.ErrorCode;
+import com.projecttaskmanager.backend.mapper.LabelMapper;
 import com.projecttaskmanager.backend.mapper.TaskMapper;
 import com.projecttaskmanager.backend.models.*;
 import com.projecttaskmanager.backend.models.enums.ActivityAction;
@@ -17,9 +19,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -34,6 +38,8 @@ public class TaskServiceImpl implements TaskService {
     private final ActivityHelper activityHelper;
     private final ApplicationEventPublisher eventPublisher;
     private final EpicRepository epicRepository;
+    private final LabelMapper labelMapper;
+    private final LabelRepository labelRepository;
 
     private User getCurrentUser() {
         return userRepository.findByEmail(
@@ -90,21 +96,23 @@ public class TaskServiceImpl implements TaskService {
 
         if (request.getTitle() != null) task.setTitle(request.getTitle());
         if (request.getDescription() != null) task.setDescription(request.getDescription());
-//        if (request.getStatusId() != null) {
-//            TaskStatus status = taskStatusRepository.findById(request.getStatusId())
-//                    .orElseThrow(() -> new AppException(ErrorCode.TASK_NOT_FOUND));
-//            task.setStatus(status);
-//        }
 
         if (request.getStatusId() != null) {
             TaskStatus newStatus = taskStatusRepository.findById(request.getStatusId())
                     .orElseThrow(() -> new AppException(ErrorCode.TASK_NOT_FOUND));
 
-            workflowService.validateTransition(
-                    task.getProject().getId(),
-                    task.getStatus(),
-                    newStatus
-            );
+            // Kiểm tra xem project có workflow không
+            boolean hasWorkflow = workflowService.hasWorkflow(task.getProject().getId());
+
+            if (hasWorkflow) {
+                // Nếu có workflow, validate transition
+                workflowService.validateTransition(
+                        task.getProject().getId(),
+                        task.getStatus(),
+                        newStatus
+                );
+            }
+            // Nếu chưa có workflow, cho phép chuyển trạng thái tự do
 
             task.setStatus(newStatus);
 
@@ -129,7 +137,6 @@ public class TaskServiceImpl implements TaskService {
                     .orElseThrow(() -> new AppException(ErrorCode.PROJECT_NOT_FOUND));
             task.setEpic(epic);
         } else if (request.getEpicId() == null && request.getEpicId() != null) {
-            // Nếu muốn xóa epic khỏi task
             task.setEpic(null);
         }
 
@@ -197,5 +204,68 @@ public class TaskServiceImpl implements TaskService {
                 .stream()
                 .map(taskMapper::toResponse)
                 .toList();
+    }
+
+    @Override
+    public List<LabelResponse> getTaskLabels(UUID taskId) {
+        Task task = taskRepository.findById(taskId)
+                .orElseThrow(() -> new AppException(ErrorCode.TASK_NOT_FOUND));
+
+        return task.getLabels().stream()
+                .map(labelMapper::toResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public void addLabelToTask(UUID taskId, UUID labelId) {
+        Task task = taskRepository.findById(taskId)
+                .orElseThrow(() -> new AppException(ErrorCode.TASK_NOT_FOUND));
+
+        Label label = labelRepository.findById(labelId)
+                .orElseThrow(() -> new AppException(ErrorCode.VALIDATION_ERROR));
+
+        // Kiểm tra label thuộc cùng project
+        if (!label.getProject().getId().equals(task.getProject().getId())) {
+            throw new AppException(ErrorCode.VALIDATION_ERROR);
+        }
+
+        task.getLabels().add(label);
+        taskRepository.save(task);
+
+        // Log activity
+        User currentUser = getCurrentUser();
+        activityHelper.log(
+                ActivityAction.TASK_UPDATED,
+                "TASK",
+                task.getId(),
+                task.getProject().getId(),
+                "Added label: " + label.getName(),
+                currentUser.getId()
+        );
+    }
+
+    @Override
+    @Transactional
+    public void removeLabelFromTask(UUID taskId, UUID labelId) {
+        Task task = taskRepository.findById(taskId)
+                .orElseThrow(() -> new AppException(ErrorCode.TASK_NOT_FOUND));
+
+        Label label = labelRepository.findById(labelId)
+                .orElseThrow(() -> new AppException(ErrorCode.VALIDATION_ERROR));
+
+        task.getLabels().remove(label);
+        taskRepository.save(task);
+
+        // Log activity
+        User currentUser = getCurrentUser();
+        activityHelper.log(
+                ActivityAction.TASK_UPDATED,
+                "TASK",
+                task.getId(),
+                task.getProject().getId(),
+                "Removed label: " + label.getName(),
+                currentUser.getId()
+        );
     }
 }

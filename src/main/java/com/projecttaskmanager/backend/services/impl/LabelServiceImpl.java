@@ -1,3 +1,4 @@
+// services/impl/LabelServiceImpl.java
 package com.projecttaskmanager.backend.services.impl;
 
 import com.projecttaskmanager.backend.dto.request.label.CreateLabelRequest;
@@ -34,8 +35,13 @@ public class LabelServiceImpl implements LabelService {
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new AppException(ErrorCode.PROJECT_NOT_FOUND));
 
+        if (labelRepository.existsByNameAndProject(request.getName(), project)) {
+            throw new AppException(ErrorCode.VALIDATION_ERROR);
+        }
+
         Label label = Label.builder()
                 .name(request.getName())
+                .project(project)
                 .color(request.getColor())
                 .build();
 
@@ -49,7 +55,14 @@ public class LabelServiceImpl implements LabelService {
         Label label = labelRepository.findById(labelId)
                 .orElseThrow(() -> new AppException(ErrorCode.VALIDATION_ERROR));
 
-        if (request.getName() != null) label.setName(request.getName());
+        if (request.getName() != null) {
+            if (!request.getName().equals(label.getName())) {
+                if (labelRepository.existsByNameAndProject(request.getName(), label.getProject())) {
+                    throw new AppException(ErrorCode.VALIDATION_ERROR);
+                }
+                label.setName(request.getName());
+            }
+        }
         if (request.getColor() != null) label.setColor(request.getColor());
 
         return labelMapper.toResponse(labelRepository.save(label));
@@ -69,7 +82,7 @@ public class LabelServiceImpl implements LabelService {
     public List<LabelResponse> getAllLabels(UUID projectId) {
         authorizationService.checkProjectMember(projectId);
 
-        return labelRepository.findAll()
+        return labelRepository.findByProjectId(projectId)
                 .stream()
                 .map(labelMapper::toResponse)
                 .toList();

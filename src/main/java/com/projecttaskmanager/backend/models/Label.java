@@ -23,6 +23,10 @@ public class Label {
 
     private String color;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "project_id", nullable = false)
+    private Project project;
+
     @ManyToMany(mappedBy = "labels")
     private Set<Task> tasks;
 }

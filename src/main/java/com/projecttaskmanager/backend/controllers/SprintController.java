@@ -71,4 +71,13 @@ public class SprintController {
                 .timestamp(Instant.now())
                 .build();
     }
+
+    @GetMapping("/{id}/tasks")
+    public ApiResponse<?> getSprintTasks(@PathVariable UUID id) {
+        return ApiResponse.builder()
+                .success(true)
+                .data(sprintService.getSprintTasks(id))
+                .timestamp(Instant.now())
+                .build();
+    }
 }

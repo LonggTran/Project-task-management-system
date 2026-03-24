@@ -1,6 +1,7 @@
 package com.projecttaskmanager.backend.services.impl;
 
-import com.projecttaskmanager.backend.config.ProjectStatusSeeder;
+import com.projecttaskmanager.backend.seeds.LabelSeederService;
+import com.projecttaskmanager.backend.seeds.ProjectStatusSeeder;
 import com.projecttaskmanager.backend.dto.request.project.CreateProjectRequest;
 import com.projecttaskmanager.backend.dto.request.project.UpdateProjectRequest;
 import com.projecttaskmanager.backend.dto.response.project.ProjectResponse;
@@ -16,6 +17,7 @@ import com.projecttaskmanager.backend.repositories.ProjectMemberRepository;
 import com.projecttaskmanager.backend.repositories.ProjectRepository;
 import com.projecttaskmanager.backend.repositories.ProjectRoleRepository;
 import com.projecttaskmanager.backend.repositories.UserRepository;
+import com.projecttaskmanager.backend.seeds.TaskStatusSeederService;
 import com.projecttaskmanager.backend.services.ProjectAuthorizationService;
 import com.projecttaskmanager.backend.services.ProjectService;
 import lombok.RequiredArgsConstructor;
@@ -37,7 +39,8 @@ public class ProjectServiceImpl implements ProjectService {
     private final ProjectRoleRepository projectRoleRepository;
     private final ProjectAuthorizationService authorizationService;
     private final ProjectMapper projectMapper;
-    private final ProjectStatusSeeder projectStatusSeeder;
+    private final LabelSeederService labelSeederService;
+    private final TaskStatusSeederService taskStatusSeederService;
 
     @Override
     public ProjectResponse createProject(CreateProjectRequest request) {
@@ -71,7 +74,8 @@ public class ProjectServiceImpl implements ProjectService {
                 .build();
 
         projectMemberRepository.save(owner);
-        projectStatusSeeder.seedDefaultStatusesForProject(project);
+        taskStatusSeederService.seedDefaultStatuses(project);
+        labelSeederService.seedDefaultLabels(project);
         return projectMapper.toResponse(project);
     }
 

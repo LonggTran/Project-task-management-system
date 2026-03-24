@@ -23,11 +23,7 @@ public enum ErrorCode {
 
     USER_ALREADY_IN_PROJECT("USER_ALREADY_IN_PROJECT", "User already in project"),
 
-    INVALID_INVITATION("INVALID_INVITATION", "Invalid invitation token"),
-
-    INVITATION_ALREADY_ACCEPTED("INVITATION_ALREADY_ACCEPTED", "Invitation already accepted"),
-
-    INVITATION_EXPIRED("INVITATION_EXPIRED", "Invitation has expired");
+    NOT_FOUND("Not found", "Not found");
 
     private final String code;
 
