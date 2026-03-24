@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -85,6 +86,19 @@ public class TaskStatusController {
         return ResponseEntity.ok(ApiResponse.<TaskStatusResponse>builder()
                 .success(true)
                 .data(taskStatusService.getById(id))
+                .timestamp(Instant.now())
+                .build());
+    }
+
+    @PutMapping("/project/{projectId}/reorder")
+    public ResponseEntity<ApiResponse<Void>> reorderStatuses(
+            @PathVariable UUID projectId,
+            @RequestBody Map<String, List<Map<String, Object>>> request) {
+        List<Map<String, Object>> statuses = request.get("statuses");
+        taskStatusService.reorderStatuses(projectId, statuses);
+        return ResponseEntity.ok(ApiResponse.<Void>builder()
+                .success(true)
+                .message("Status order updated")
                 .timestamp(Instant.now())
                 .build());
     }
