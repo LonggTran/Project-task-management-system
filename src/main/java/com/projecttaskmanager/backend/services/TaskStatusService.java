@@ -6,6 +6,7 @@ import com.projecttaskmanager.backend.dto.request.task.UpdateTaskStatusRequest;
 import com.projecttaskmanager.backend.dto.response.task.TaskStatusResponse;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 public interface TaskStatusService {
@@ -16,4 +17,5 @@ public interface TaskStatusService {
     List<TaskStatusResponse> getByProject(UUID projectId);
     List<TaskStatusResponse> getAll();
     TaskStatusResponse getDefaultStatus(UUID projectId);
+    void reorderStatuses(UUID projectId, List<Map<String, Object>> statuses);
 }

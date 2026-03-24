@@ -13,8 +13,10 @@ import com.projecttaskmanager.backend.repositories.TaskStatusRepository;
 import com.projecttaskmanager.backend.services.TaskStatusService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -130,5 +132,27 @@ public class TaskStatusServiceImpl implements TaskStatusService {
                 .orElseThrow(() -> new AppException(ErrorCode.TASK_NOT_FOUND));
 
         return taskStatusMapper.toResponse(defaultStatus);
+    }
+
+    @Override
+    @Transactional
+    public void reorderStatuses(UUID projectId, List<Map<String, Object>> statuses) {
+        Project project = projectRepository.findById(projectId)
+                .orElseThrow(() -> new AppException(ErrorCode.PROJECT_NOT_FOUND));
+
+        for (Map<String, Object> statusData : statuses) {
+            UUID statusId = UUID.fromString((String) statusData.get("id"));
+            Integer sort = (Integer) statusData.get("sort");
+
+            TaskStatus status = taskStatusRepository.findById(statusId)
+                    .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
+
+            if (!status.getProject().getId().equals(projectId)) {
+                throw new AppException(ErrorCode.FORBIDDEN);
+            }
+
+            status.setSort(sort);
+            taskStatusRepository.save(status);
+        }
     }
 }
