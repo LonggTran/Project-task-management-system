@@ -8,4 +8,6 @@ public interface AuthService {
     AuthResponse register(RegisterRequest request);
     AuthResponse login(LoginRequest request);
     AuthResponse loginWithGoogle(String idToken);
+    void sendOtp(RegisterRequest request);
+    AuthResponse verifyOtp(String email, String otp);
 }
