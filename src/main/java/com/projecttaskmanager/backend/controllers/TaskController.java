@@ -1,8 +1,10 @@
+// controllers/TaskController.java
 package com.projecttaskmanager.backend.controllers;
 
 import com.projecttaskmanager.backend.dto.request.task.CreateTaskRequest;
 import com.projecttaskmanager.backend.dto.request.task.UpdateTaskRequest;
 import com.projecttaskmanager.backend.dto.response.ApiResponse;
+import com.projecttaskmanager.backend.dto.response.label.LabelResponse;
 import com.projecttaskmanager.backend.dto.response.task.TaskResponse;
 import com.projecttaskmanager.backend.services.TaskService;
 import lombok.RequiredArgsConstructor;
@@ -11,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -67,6 +70,43 @@ public class TaskController {
         return ResponseEntity.ok(ApiResponse.<List<TaskResponse>>builder()
                 .success(true)
                 .data(response)
+                .timestamp(Instant.now())
+                .build());
+    }
+
+    // ============= TASK LABELS ENDPOINTS =============
+
+    @GetMapping("/{taskId}/labels")
+    public ResponseEntity<ApiResponse<List<LabelResponse>>> getTaskLabels(@PathVariable UUID taskId) {
+        List<LabelResponse> labels = taskService.getTaskLabels(taskId);
+        return ResponseEntity.ok(ApiResponse.<List<LabelResponse>>builder()
+                .success(true)
+                .data(labels)
+                .timestamp(Instant.now())
+                .build());
+    }
+
+    @PostMapping("/{taskId}/labels")
+    public ResponseEntity<ApiResponse<Void>> addLabelToTask(
+            @PathVariable UUID taskId,
+            @RequestBody Map<String, UUID> request) {
+        UUID labelId = request.get("labelId");
+        taskService.addLabelToTask(taskId, labelId);
+        return ResponseEntity.ok(ApiResponse.<Void>builder()
+                .success(true)
+                .message("Label added to task")
+                .timestamp(Instant.now())
+                .build());
+    }
+
+    @DeleteMapping("/{taskId}/labels/{labelId}")
+    public ResponseEntity<ApiResponse<Void>> removeLabelFromTask(
+            @PathVariable UUID taskId,
+            @PathVariable UUID labelId) {
+        taskService.removeLabelFromTask(taskId, labelId);
+        return ResponseEntity.ok(ApiResponse.<Void>builder()
+                .success(true)
+                .message("Label removed from task")
                 .timestamp(Instant.now())
                 .build());
     }

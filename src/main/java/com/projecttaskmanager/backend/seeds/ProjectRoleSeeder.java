@@ -1,4 +1,4 @@
-package com.projecttaskmanager.backend.config;
+package com.projecttaskmanager.backend.seeds;
 
 import com.projecttaskmanager.backend.models.Permission;
 import com.projecttaskmanager.backend.models.ProjectRole;

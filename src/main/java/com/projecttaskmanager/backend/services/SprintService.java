@@ -15,4 +15,5 @@ public interface SprintService {
     SprintTaskResponse addTask(AddTaskToSprintRequest request);
     void removeTask(UUID sprintTaskId);
     List<SprintResponse> getByProject(UUID projectId);
+    List<SprintTaskResponse> getSprintTasks(UUID sprintId);
 }

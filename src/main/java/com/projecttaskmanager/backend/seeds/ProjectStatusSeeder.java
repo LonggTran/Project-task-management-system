@@ -1,5 +1,5 @@
 // config/ProjectStatusSeeder.java
-package com.projecttaskmanager.backend.config;
+package com.projecttaskmanager.backend.seeds;
 
 import com.projecttaskmanager.backend.models.Project;
 import com.projecttaskmanager.backend.models.TaskStatus;
