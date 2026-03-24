@@ -50,4 +50,23 @@ public class AuthController {
                 .build();
     }
 
+    @PostMapping("/send-otp")
+    public ApiResponse<Void> sendOtp(@RequestBody RegisterRequest request) {
+        authService.sendOtp(request);
+        return ApiResponse.<Void>builder()
+                .success(true)
+                .message("OTP sent")
+                .build();
+    }
+
+    @PostMapping("/verify-otp")
+    public ApiResponse<AuthResponse> verifyOtp(
+            @RequestParam String email,
+            @RequestParam String otp
+    ) {
+        return ApiResponse.<AuthResponse>builder()
+                .success(true)
+                .data(authService.verifyOtp(email, otp))
+                .build();
+    }
 }
