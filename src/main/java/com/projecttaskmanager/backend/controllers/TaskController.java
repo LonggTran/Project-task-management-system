@@ -1,4 +1,3 @@
-// controllers/TaskController.java
 package com.projecttaskmanager.backend.controllers;
 
 import com.projecttaskmanager.backend.dto.request.task.CreateTaskRequest;
@@ -7,6 +6,7 @@ import com.projecttaskmanager.backend.dto.response.ApiResponse;
 import com.projecttaskmanager.backend.dto.response.label.LabelResponse;
 import com.projecttaskmanager.backend.dto.response.task.TaskResponse;
 import com.projecttaskmanager.backend.services.TaskService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -24,7 +24,7 @@ public class TaskController {
     private final TaskService taskService;
 
     @PostMapping
-    public ResponseEntity<ApiResponse<TaskResponse>> create(@RequestBody CreateTaskRequest request) {
+    public ResponseEntity<ApiResponse<TaskResponse>> create(@Valid @RequestBody CreateTaskRequest request) {
         TaskResponse response = taskService.create(request);
         return ResponseEntity.ok(ApiResponse.<TaskResponse>builder()
                 .success(true)
@@ -34,8 +34,9 @@ public class TaskController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<ApiResponse<TaskResponse>> update(@PathVariable UUID id,
-                                                            @RequestBody UpdateTaskRequest request) {
+    public ResponseEntity<ApiResponse<TaskResponse>> update(
+            @PathVariable UUID id,
+            @Valid @RequestBody UpdateTaskRequest request) {
         TaskResponse response = taskService.update(id, request);
         return ResponseEntity.ok(ApiResponse.<TaskResponse>builder()
                 .success(true)
@@ -73,8 +74,6 @@ public class TaskController {
                 .timestamp(Instant.now())
                 .build());
     }
-
-    // ============= TASK LABELS ENDPOINTS =============
 
     @GetMapping("/{taskId}/labels")
     public ResponseEntity<ApiResponse<List<LabelResponse>>> getTaskLabels(@PathVariable UUID taskId) {

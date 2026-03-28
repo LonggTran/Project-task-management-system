@@ -1,3 +1,4 @@
+// Sprint.java
 package com.projecttaskmanager.backend.models;
 
 import com.projecttaskmanager.backend.models.enums.SprintStatus;
@@ -5,7 +6,8 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDate;
-import java.util.Set;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 @Entity
@@ -34,6 +36,7 @@ public class Sprint {
     @JoinColumn(name = "project_id")
     private Project project;
 
-    @OneToMany(mappedBy = "sprint")
-    private Set<SprintTask> sprintTasks;
+    @OneToMany(mappedBy = "sprint", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<SprintTask> sprintTasks = new ArrayList<>();
 }

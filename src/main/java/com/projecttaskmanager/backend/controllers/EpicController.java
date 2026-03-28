@@ -5,6 +5,7 @@ import com.projecttaskmanager.backend.dto.request.epic.UpdateEpicRequest;
 import com.projecttaskmanager.backend.dto.response.ApiResponse;
 import com.projecttaskmanager.backend.dto.response.epic.EpicResponse;
 import com.projecttaskmanager.backend.services.EpicService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -21,7 +22,7 @@ public class EpicController {
     private final EpicService epicService;
 
     @PostMapping
-    public ResponseEntity<ApiResponse<EpicResponse>> create(@RequestBody CreateEpicRequest request) {
+    public ResponseEntity<ApiResponse<EpicResponse>> create(@Valid @RequestBody CreateEpicRequest request) {
         return ResponseEntity.ok(ApiResponse.<EpicResponse>builder()
                 .success(true)
                 .data(epicService.create(request))
@@ -32,7 +33,7 @@ public class EpicController {
     @PutMapping("/{id}")
     public ResponseEntity<ApiResponse<EpicResponse>> update(
             @PathVariable UUID id,
-            @RequestBody UpdateEpicRequest request
+            @Valid @RequestBody UpdateEpicRequest request
     ) {
         return ResponseEntity.ok(ApiResponse.<EpicResponse>builder()
                 .success(true)
@@ -44,7 +45,6 @@ public class EpicController {
     @DeleteMapping("/{id}")
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable UUID id) {
         epicService.delete(id);
-
         return ResponseEntity.ok(ApiResponse.<Void>builder()
                 .success(true)
                 .message("Epic deleted")
