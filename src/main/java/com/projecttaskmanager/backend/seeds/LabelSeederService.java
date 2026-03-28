@@ -16,13 +16,12 @@ public class LabelSeederService {
     private final LabelRepository labelRepository;
 
     public void seedDefaultLabels(Project project) {
-        // Chỉ seed nếu project chưa có labels
         if (labelRepository.findByProjectId(project.getId()).isEmpty()) {
             List<Label> defaultLabels = List.of(
-                    Label.builder().name("bug").color("#ef4444").project(project).build(),
-                    Label.builder().name("feature").color("#3b82f6").project(project).build(),
-                    Label.builder().name("urgent").color("#f97316").project(project).build(),
-                    Label.builder().name("improvement").color("#22c55e").project(project).build()
+                    Label.builder().name("bug").color("#ef4444").project(project).description("bug nè").build(),
+                    Label.builder().name("feature").color("#3b82f6").project(project).description("chức năng mới nè").build(),
+                    Label.builder().name("urgent").color("#f97316").project(project).description("urgent nè").build(),
+                    Label.builder().name("improvement").color("#22c55e").project(project).description("phát triển tính năng nè").build()
             );
 
             labelRepository.saveAll(defaultLabels);

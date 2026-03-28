@@ -19,6 +19,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import com.projecttaskmanager.backend.events.NotificationEvent;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.UUID;
@@ -198,5 +199,61 @@ public class SprintServiceImpl implements SprintService {
                 .stream()
                 .map(sprintTaskMapper::toResponse)
                 .toList();
+    }
+
+    @Override
+    public SprintResponse update(UUID sprintId, CreateSprintRequest request) {
+        Sprint sprint = sprintRepository.findById(sprintId)
+                .orElseThrow(() -> new AppException(ErrorCode.SPRINT_NOT_FOUND));
+
+        auth.checkPermission(sprint.getProject().getId(), "SPRINT_UPDATE");
+
+        // Không cho phép sửa sprint đã active hoặc closed
+        if (sprint.getStatus() != SprintStatus.PLANNING) {
+            throw new AppException(ErrorCode.SPRINT_CANNOT_UPDATE);
+        }
+
+        sprint.setName(request.getName());
+        sprint.setStartDate(request.getStartDate());
+        sprint.setEndDate(request.getEndDate());
+
+        Sprint saved = sprintRepository.save(sprint);
+
+        activityHelper.log(
+                ActivityAction.SPRINT_UPDATED,
+                "SPRINT",
+                saved.getId(),
+                sprint.getProject().getId(),
+                "Updated sprint: " + saved.getName(),
+                null
+        );
+
+        return sprintMapper.toResponse(saved);
+    }
+
+    @Override
+    @Transactional
+    public void delete(UUID sprintId) {
+        Sprint sprint = sprintRepository.findById(sprintId)
+                .orElseThrow(() -> new AppException(ErrorCode.SPRINT_NOT_FOUND));
+
+        auth.checkPermission(sprint.getProject().getId(), "SPRINT_DELETE");
+
+        // Không cho phép xóa sprint đã active hoặc closed
+        if (sprint.getStatus() != SprintStatus.PLANNING) {
+            throw new AppException(ErrorCode.SPRINT_CANNOT_DELETE);
+        }
+
+        sprintTaskRepository.deleteBySprint(sprint);
+        sprintRepository.delete(sprint);
+
+        activityHelper.log(
+                ActivityAction.SPRINT_DELETED,
+                "SPRINT",
+                sprint.getId(),
+                sprint.getProject().getId(),
+                "Deleted sprint: " + sprint.getName(),
+                null
+        );
     }
 }

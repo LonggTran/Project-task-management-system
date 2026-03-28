@@ -12,4 +12,5 @@ import java.util.UUID;
 public interface SprintTaskRepository extends JpaRepository<SprintTask, UUID> {
     List<SprintTask> findBySprint(Sprint sprint);
     Optional<SprintTask> findBySprintAndTask(Sprint sprint, Task task);
+    void deleteBySprint(Sprint entity);
 }

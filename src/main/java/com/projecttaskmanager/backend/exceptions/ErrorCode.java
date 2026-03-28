@@ -23,7 +23,11 @@ public enum ErrorCode {
 
     USER_ALREADY_IN_PROJECT("USER_ALREADY_IN_PROJECT", "User already in project"),
 
-    NOT_FOUND("Not found", "Not found");
+    NOT_FOUND("Not found", "Not found"),
+
+    SPRINT_NOT_FOUND("SPRINT_NOT_FOUND", "Sprint not found"),
+    SPRINT_CANNOT_UPDATE("SPRINT_CANNOT_UPDATE", "Cannot update sprint that is active or closed"),
+    SPRINT_CANNOT_DELETE("SPRINT_CANNOT_DELETE", "Cannot delete sprint that is active or closed");
 
     private final String code;
 

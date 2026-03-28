@@ -51,7 +51,6 @@ public class TaskAssigneeServiceImpl implements TaskAssigneeService {
 
         User currentUser = getCurrentUser();
 
-        // kiểm tra đã gán chưa
         assigneeRepository.findByTaskAndUser(task, user).ifPresent(a -> {
             throw new AppException(ErrorCode.VALIDATION_ERROR);
         });
@@ -94,12 +93,10 @@ public class TaskAssigneeServiceImpl implements TaskAssigneeService {
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new AppException(ErrorCode.TASK_NOT_FOUND));
 
-        // Lấy user hiện tại từ SecurityContext
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
-        // Kiểm tra đã assign chưa
         assigneeRepository.findByTaskAndUser(task, user)
                 .ifPresent(a -> { throw new AppException(ErrorCode.VALIDATION_ERROR); });
 

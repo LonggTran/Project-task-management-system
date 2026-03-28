@@ -14,6 +14,7 @@ public class LabelMapper {
                 .id(label.getId())
                 .name(label.getName())
                 .color(label.getColor())
+                .description(label.getDescription())
                 .build();
     }
 }
