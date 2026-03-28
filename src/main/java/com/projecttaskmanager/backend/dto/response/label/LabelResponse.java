@@ -11,4 +11,5 @@ public class LabelResponse {
     private UUID id;
     private String name;
     private String color;
+    private String description;
 }

@@ -3,8 +3,10 @@ package com.projecttaskmanager.backend.controllers;
 import com.projecttaskmanager.backend.dto.request.sprint.AddTaskToSprintRequest;
 import com.projecttaskmanager.backend.dto.request.sprint.CreateSprintRequest;
 import com.projecttaskmanager.backend.dto.response.ApiResponse;
+import com.projecttaskmanager.backend.dto.response.sprint.SprintResponse;
 import com.projecttaskmanager.backend.services.SprintService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
@@ -79,5 +81,25 @@ public class SprintController {
                 .data(sprintService.getSprintTasks(id))
                 .timestamp(Instant.now())
                 .build();
+    }
+
+    @PutMapping("/{sprintId}")
+    public ResponseEntity<ApiResponse<SprintResponse>> update(@PathVariable UUID sprintId, @RequestBody CreateSprintRequest request) {
+        SprintResponse response = sprintService.update(sprintId, request);
+        return ResponseEntity.ok(ApiResponse.<SprintResponse>builder()
+                .success(true)
+                .data(response)
+                .timestamp(Instant.now())
+                .build());
+    }
+
+    @DeleteMapping("/{sprintId}")
+    public ResponseEntity<ApiResponse<Void>> delete(@PathVariable UUID sprintId) {
+        sprintService.delete(sprintId);
+        return ResponseEntity.ok(ApiResponse.<Void>builder()
+                .success(true)
+                .message("sprint removed from task")
+                .timestamp(Instant.now())
+                .build());
     }
 }

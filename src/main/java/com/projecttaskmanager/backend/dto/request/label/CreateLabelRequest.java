@@ -6,4 +6,5 @@ import lombok.Data;
 public class CreateLabelRequest {
     private String name;
     private String color;
+    private String description;
 }

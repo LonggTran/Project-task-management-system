@@ -43,6 +43,7 @@ public class LabelServiceImpl implements LabelService {
                 .name(request.getName())
                 .project(project)
                 .color(request.getColor())
+                .description(request.getDescription())
                 .build();
 
         return labelMapper.toResponse(labelRepository.save(label));
