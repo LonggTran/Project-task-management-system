@@ -1,3 +1,4 @@
+// Epic.java
 package com.projecttaskmanager.backend.models;
 
 import com.projecttaskmanager.backend.models.baseModels.BaseEntity;
@@ -5,7 +6,8 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDate;
-import java.util.Set;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 @Entity
@@ -38,6 +40,7 @@ public class Epic extends BaseEntity {
 
     private LocalDate endDate;
 
-    @OneToMany(mappedBy = "epic")
-    private Set<Task> tasks;
+    @OneToMany(mappedBy = "epic", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<Task> tasks = new ArrayList<>();
 }

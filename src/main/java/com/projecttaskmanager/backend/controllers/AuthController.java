@@ -6,7 +6,9 @@ import com.projecttaskmanager.backend.dto.request.auth.RegisterRequest;
 import com.projecttaskmanager.backend.dto.response.ApiResponse;
 import com.projecttaskmanager.backend.dto.response.auth.AuthResponse;
 import com.projecttaskmanager.backend.services.AuthService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
@@ -19,54 +21,54 @@ public class AuthController {
     private final AuthService authService;
 
     @PostMapping("/register")
-    public ApiResponse<AuthResponse> register(@RequestBody RegisterRequest request) {
-        return ApiResponse.<AuthResponse>builder()
+    public ResponseEntity<ApiResponse<AuthResponse>> register(@Valid @RequestBody RegisterRequest request) {
+        return ResponseEntity.ok(ApiResponse.<AuthResponse>builder()
                 .success(true)
                 .message("Register success")
                 .data(authService.register(request))
                 .timestamp(Instant.now())
-                .build();
+                .build());
     }
 
     @PostMapping("/login")
-    public ApiResponse<AuthResponse> login(@RequestBody LoginRequest request) {
-        return ApiResponse.<AuthResponse>builder()
+    public ResponseEntity<ApiResponse<AuthResponse>> login(@Valid @RequestBody LoginRequest request) {
+        return ResponseEntity.ok(ApiResponse.<AuthResponse>builder()
                 .success(true)
                 .message("Login success")
                 .data(authService.login(request))
                 .timestamp(Instant.now())
-                .build();
+                .build());
     }
 
     @PostMapping("/google")
-    public ApiResponse<AuthResponse> loginWithGoogle(
-            @RequestBody GoogleLoginRequest request
-    ) {
-        return ApiResponse.<AuthResponse>builder()
+    public ResponseEntity<ApiResponse<AuthResponse>> loginWithGoogle(
+            @Valid @RequestBody GoogleLoginRequest request) {
+        return ResponseEntity.ok(ApiResponse.<AuthResponse>builder()
                 .success(true)
                 .message("Google login success")
                 .data(authService.loginWithGoogle(request.getIdToken()))
                 .timestamp(Instant.now())
-                .build();
+                .build());
     }
 
     @PostMapping("/send-otp")
-    public ApiResponse<Void> sendOtp(@RequestBody RegisterRequest request) {
+    public ResponseEntity<ApiResponse<Void>> sendOtp(@Valid @RequestBody RegisterRequest request) {
         authService.sendOtp(request);
-        return ApiResponse.<Void>builder()
+        return ResponseEntity.ok(ApiResponse.<Void>builder()
                 .success(true)
                 .message("OTP sent")
-                .build();
+                .timestamp(Instant.now())
+                .build());
     }
 
     @PostMapping("/verify-otp")
-    public ApiResponse<AuthResponse> verifyOtp(
-            @RequestParam String email,
-            @RequestParam String otp
-    ) {
-        return ApiResponse.<AuthResponse>builder()
+    public ResponseEntity<ApiResponse<AuthResponse>> verifyOtp(
+            @RequestParam @jakarta.validation.constraints.Email String email,
+            @RequestParam @jakarta.validation.constraints.Pattern(regexp = "^[0-9]{6}$") String otp) {
+        return ResponseEntity.ok(ApiResponse.<AuthResponse>builder()
                 .success(true)
                 .data(authService.verifyOtp(email, otp))
-                .build();
+                .timestamp(Instant.now())
+                .build());
     }
 }

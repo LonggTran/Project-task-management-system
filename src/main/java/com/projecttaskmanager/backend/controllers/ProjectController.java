@@ -5,7 +5,9 @@ import com.projecttaskmanager.backend.dto.request.project.UpdateProjectRequest;
 import com.projecttaskmanager.backend.dto.response.ApiResponse;
 import com.projecttaskmanager.backend.dto.response.project.ProjectResponse;
 import com.projecttaskmanager.backend.services.ProjectService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
@@ -20,52 +22,52 @@ public class ProjectController {
     private final ProjectService projectService;
 
     @PostMapping
-    public ApiResponse<ProjectResponse> createProject(@RequestBody CreateProjectRequest request) {
-        return ApiResponse.<ProjectResponse>builder()
+    public ResponseEntity<ApiResponse<ProjectResponse>> createProject(@Valid @RequestBody CreateProjectRequest request) {
+        return ResponseEntity.ok(ApiResponse.<ProjectResponse>builder()
                 .success(true)
                 .message("Project created")
                 .data(projectService.createProject(request))
                 .timestamp(Instant.now())
-                .build();
+                .build());
     }
 
     @GetMapping
-    public ApiResponse<List<ProjectResponse>> getAllProjects() {
-        return ApiResponse.<List<ProjectResponse>>builder()
+    public ResponseEntity<ApiResponse<List<ProjectResponse>>> getAllProjects() {
+        return ResponseEntity.ok(ApiResponse.<List<ProjectResponse>>builder()
                 .success(true)
                 .message("All projects")
                 .data(projectService.getAllProjects())
                 .timestamp(Instant.now())
-                .build();
+                .build());
     }
 
     @GetMapping("/{id}")
-    public ApiResponse<ProjectResponse> getProjectById(@PathVariable UUID id) {
-        return ApiResponse.<ProjectResponse>builder()
+    public ResponseEntity<ApiResponse<ProjectResponse>> getProjectById(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.<ProjectResponse>builder()
                 .success(true)
                 .data(projectService.getProjectById(id))
                 .timestamp(Instant.now())
-                .build();
+                .build());
     }
 
     @PutMapping("/{id}")
-    public ApiResponse<ProjectResponse> updateProject(@PathVariable UUID id, @RequestBody UpdateProjectRequest request) {
-        return ApiResponse.<ProjectResponse>builder()
+    public ResponseEntity<ApiResponse<ProjectResponse>> updateProject(
+            @PathVariable UUID id,
+            @Valid @RequestBody UpdateProjectRequest request) {
+        return ResponseEntity.ok(ApiResponse.<ProjectResponse>builder()
                 .success(true)
                 .data(projectService.updateProject(id, request))
                 .timestamp(Instant.now())
-                .build();
+                .build());
     }
 
     @DeleteMapping("/{id}")
-    public ApiResponse<Void> deleteProject(@PathVariable UUID id) {
-
+    public ResponseEntity<ApiResponse<Void>> deleteProject(@PathVariable UUID id) {
         projectService.deleteProject(id);
-
-        return ApiResponse.<Void>builder()
+        return ResponseEntity.ok(ApiResponse.<Void>builder()
                 .success(true)
                 .message("Project deleted")
                 .timestamp(Instant.now())
-                .build();
+                .build());
     }
 }

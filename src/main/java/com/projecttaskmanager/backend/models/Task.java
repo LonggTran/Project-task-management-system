@@ -52,7 +52,7 @@ public class Task extends BaseEntity {
     @JoinColumn(name = "parent_task_id")
     private Task parentTask;
 
-    @OneToMany(mappedBy = "parentTask")
+    @OneToMany(mappedBy = "parentTask", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<Task> subtasks;
 
     @ManyToMany

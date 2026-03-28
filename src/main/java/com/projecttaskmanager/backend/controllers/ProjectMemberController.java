@@ -4,7 +4,9 @@ import com.projecttaskmanager.backend.dto.request.project.AddMemberRequest;
 import com.projecttaskmanager.backend.dto.response.ApiResponse;
 import com.projecttaskmanager.backend.dto.response.project.ProjectMemberResponse;
 import com.projecttaskmanager.backend.services.ProjectMemberService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
@@ -19,46 +21,48 @@ public class ProjectMemberController {
     private final ProjectMemberService projectMemberService;
 
     @PostMapping
-    public ApiResponse<ProjectMemberResponse> addMember(@PathVariable UUID projectId, @RequestBody AddMemberRequest request) {
-        return ApiResponse.<ProjectMemberResponse>builder()
+    public ResponseEntity<ApiResponse<ProjectMemberResponse>> addMember(
+            @PathVariable UUID projectId,
+            @Valid @RequestBody AddMemberRequest request) {
+        return ResponseEntity.ok(ApiResponse.<ProjectMemberResponse>builder()
                 .success(true)
                 .message("Member added")
                 .data(projectMemberService.addMember(projectId, request))
                 .timestamp(Instant.now())
-                .build();
+                .build());
     }
 
     @GetMapping
-    public ApiResponse<List<ProjectMemberResponse>> getMembers(@PathVariable UUID projectId) {
-        return ApiResponse.<List<ProjectMemberResponse>>builder()
+    public ResponseEntity<ApiResponse<List<ProjectMemberResponse>>> getMembers(@PathVariable UUID projectId) {
+        return ResponseEntity.ok(ApiResponse.<List<ProjectMemberResponse>>builder()
                 .success(true)
                 .message("Members fetched")
                 .data(projectMemberService.getMembers(projectId))
                 .timestamp(Instant.now())
-                .build();
+                .build());
     }
 
     @DeleteMapping("/{userId}")
-    public ApiResponse<Void> removeMember(@PathVariable UUID projectId, @PathVariable UUID userId) {
+    public ResponseEntity<ApiResponse<Void>> removeMember(
+            @PathVariable UUID projectId,
+            @PathVariable UUID userId) {
         projectMemberService.removeMember(projectId, userId);
-        return ApiResponse.<Void>builder()
+        return ResponseEntity.ok(ApiResponse.<Void>builder()
                 .success(true)
                 .message("Member removed")
                 .timestamp(Instant.now())
-                .build();
+                .build());
     }
 
     @PostMapping("/invite")
-    public ApiResponse<Void> inviteMember(
+    public ResponseEntity<ApiResponse<Void>> inviteMember(
             @PathVariable UUID projectId,
-            @RequestBody AddMemberRequest request
-    ) {
+            @Valid @RequestBody AddMemberRequest request) {
         projectMemberService.inviteMember(projectId, request);
-
-        return ApiResponse.<Void>builder()
+        return ResponseEntity.ok(ApiResponse.<Void>builder()
                 .success(true)
                 .message("Invitation sent")
                 .timestamp(Instant.now())
-                .build();
+                .build());
     }
 }

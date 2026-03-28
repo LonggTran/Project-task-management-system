@@ -5,6 +5,7 @@ import com.projecttaskmanager.backend.dto.request.label.UpdateLabelRequest;
 import com.projecttaskmanager.backend.dto.response.ApiResponse;
 import com.projecttaskmanager.backend.dto.response.label.LabelResponse;
 import com.projecttaskmanager.backend.services.LabelService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -21,8 +22,9 @@ public class LabelController {
     private final LabelService labelService;
 
     @PostMapping("/{projectId}")
-    public ResponseEntity<ApiResponse<LabelResponse>> createLabel(@PathVariable UUID projectId,
-                                                                  @RequestBody CreateLabelRequest request) {
+    public ResponseEntity<ApiResponse<LabelResponse>> createLabel(
+            @PathVariable UUID projectId,
+            @Valid @RequestBody CreateLabelRequest request) {
         LabelResponse response = labelService.createLabel(request, projectId);
         return ResponseEntity.ok(ApiResponse.<LabelResponse>builder()
                 .success(true)
@@ -33,9 +35,10 @@ public class LabelController {
     }
 
     @PutMapping("/{projectId}/{labelId}")
-    public ResponseEntity<ApiResponse<LabelResponse>> updateLabel(@PathVariable UUID projectId,
-                                                                  @PathVariable UUID labelId,
-                                                                  @RequestBody UpdateLabelRequest request) {
+    public ResponseEntity<ApiResponse<LabelResponse>> updateLabel(
+            @PathVariable UUID projectId,
+            @PathVariable UUID labelId,
+            @Valid @RequestBody UpdateLabelRequest request) {
         LabelResponse response = labelService.updateLabel(labelId, request, projectId);
         return ResponseEntity.ok(ApiResponse.<LabelResponse>builder()
                 .success(true)
@@ -46,8 +49,9 @@ public class LabelController {
     }
 
     @DeleteMapping("/{projectId}/{labelId}")
-    public ResponseEntity<ApiResponse<Void>> deleteLabel(@PathVariable UUID projectId,
-                                                         @PathVariable UUID labelId) {
+    public ResponseEntity<ApiResponse<Void>> deleteLabel(
+            @PathVariable UUID projectId,
+            @PathVariable UUID labelId) {
         labelService.deleteLabel(labelId, projectId);
         return ResponseEntity.ok(ApiResponse.<Void>builder()
                 .success(true)
@@ -68,8 +72,9 @@ public class LabelController {
     }
 
     @GetMapping("/{projectId}/{labelId}")
-    public ResponseEntity<ApiResponse<LabelResponse>> getLabelById(@PathVariable UUID projectId,
-                                                                   @PathVariable UUID labelId) {
+    public ResponseEntity<ApiResponse<LabelResponse>> getLabelById(
+            @PathVariable UUID projectId,
+            @PathVariable UUID labelId) {
         LabelResponse response = labelService.getLabelById(labelId, projectId);
         return ResponseEntity.ok(ApiResponse.<LabelResponse>builder()
                 .success(true)

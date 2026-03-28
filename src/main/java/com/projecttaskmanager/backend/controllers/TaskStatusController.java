@@ -1,4 +1,3 @@
-// controllers/TaskStatusController.java
 package com.projecttaskmanager.backend.controllers;
 
 import com.projecttaskmanager.backend.dto.request.task.CreateTaskStatusRequest;
@@ -6,6 +5,7 @@ import com.projecttaskmanager.backend.dto.request.task.UpdateTaskStatusRequest;
 import com.projecttaskmanager.backend.dto.response.ApiResponse;
 import com.projecttaskmanager.backend.dto.response.task.TaskStatusResponse;
 import com.projecttaskmanager.backend.services.TaskStatusService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -52,7 +52,7 @@ public class TaskStatusController {
     @PostMapping("/project/{projectId}")
     public ResponseEntity<ApiResponse<TaskStatusResponse>> create(
             @PathVariable UUID projectId,
-            @RequestBody CreateTaskStatusRequest request) {
+            @Valid @RequestBody CreateTaskStatusRequest request) {
         return ResponseEntity.ok(ApiResponse.<TaskStatusResponse>builder()
                 .success(true)
                 .data(taskStatusService.create(projectId, request))
@@ -63,7 +63,7 @@ public class TaskStatusController {
     @PutMapping("/{id}")
     public ResponseEntity<ApiResponse<TaskStatusResponse>> update(
             @PathVariable UUID id,
-            @RequestBody UpdateTaskStatusRequest request) {
+            @Valid @RequestBody UpdateTaskStatusRequest request) {
         return ResponseEntity.ok(ApiResponse.<TaskStatusResponse>builder()
                 .success(true)
                 .data(taskStatusService.update(id, request))

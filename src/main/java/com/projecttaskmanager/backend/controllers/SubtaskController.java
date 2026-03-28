@@ -5,6 +5,7 @@ import com.projecttaskmanager.backend.dto.response.ApiResponse;
 import com.projecttaskmanager.backend.dto.response.task.SubtaskResponse;
 import com.projecttaskmanager.backend.dto.response.task.SubtaskTreeResponse;
 import com.projecttaskmanager.backend.services.SubtaskService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -23,12 +24,12 @@ public class SubtaskController {
     @PostMapping("/{parentId}")
     public ResponseEntity<ApiResponse<SubtaskResponse>> create(
             @PathVariable UUID parentId,
-            @RequestBody CreateTaskRequest request
+            @Valid @RequestBody CreateTaskRequest request
     ) {
         return ResponseEntity.ok(ApiResponse.<SubtaskResponse>builder()
                 .success(true)
                 .data(subtaskService.create(parentId, request))
-                .message("add subtask success")
+                .message("Add subtask success")
                 .timestamp(Instant.now())
                 .build());
     }
@@ -46,9 +47,7 @@ public class SubtaskController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable UUID id) {
-
         subtaskService.delete(id);
-
         return ResponseEntity.ok(ApiResponse.<Void>builder()
                 .success(true)
                 .message("Subtask deleted")
@@ -58,7 +57,6 @@ public class SubtaskController {
 
     @GetMapping("/tree/{taskId}")
     public ResponseEntity<ApiResponse<SubtaskTreeResponse>> getTree(@PathVariable UUID taskId) {
-
         return ResponseEntity.ok(ApiResponse.<SubtaskTreeResponse>builder()
                 .success(true)
                 .data(subtaskService.getTree(taskId))
