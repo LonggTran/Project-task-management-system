@@ -37,7 +37,6 @@ public class NotificationServiceImpl implements NotificationService {
     public void send(UUID receiverId, String title, String content, String type, UUID referenceId, UUID actorId) {
         User receiver = userRepository.findById(receiverId).orElseThrow();
 
-        // Không gửi thông báo cho chính mình
         if (actorId != null && actorId.equals(receiverId)) {
             return;
         }
