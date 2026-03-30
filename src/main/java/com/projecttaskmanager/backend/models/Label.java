@@ -7,7 +7,10 @@ import java.util.Set;
 import java.util.UUID;
 
 @Entity
-@Table(name = "labels")
+@Table(
+        name = "labels",
+        uniqueConstraints = @UniqueConstraint(columnNames = {"name", "project_id"})
+)
 @Getter
 @Setter
 @Builder
@@ -18,7 +21,7 @@ public class Label {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @Column(nullable = false, unique = true)
+    @Column(nullable = false)
     private String name;
 
     private String color;
