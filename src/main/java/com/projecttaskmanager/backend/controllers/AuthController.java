@@ -71,4 +71,27 @@ public class AuthController {
                 .timestamp(Instant.now())
                 .build());
     }
+
+    @PostMapping("/logout")
+    public ResponseEntity<ApiResponse<Void>> logout(@RequestHeader("Authorization") String authHeader) {
+
+        String token = authHeader.substring(7);
+
+        authService.logout(token);
+
+        return ResponseEntity.ok(ApiResponse.<Void>builder()
+                .success(true)
+                .message("Logout success")
+                .timestamp(Instant.now())
+                .build());
+    }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<ApiResponse<AuthResponse>> refresh(@RequestParam String refreshToken) {
+        return ResponseEntity.ok(ApiResponse.<AuthResponse>builder()
+                .success(true)
+                .data(authService.refreshToken(refreshToken))
+                .timestamp(Instant.now())
+                .build());
+    }
 }
