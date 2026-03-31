@@ -13,6 +13,7 @@ import com.projecttaskmanager.backend.repositories.RoleRepository;
 import com.projecttaskmanager.backend.repositories.UserRepository;
 import com.projecttaskmanager.backend.services.AuthService;
 import com.projecttaskmanager.backend.services.EmailService;
+import com.projecttaskmanager.backend.services.JwtRedisService;
 import com.projecttaskmanager.backend.services.JwtService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -38,6 +39,7 @@ public class AuthServiceImpl implements AuthService {
     private final JwtService jwtService;
     private final EmailVerificationRepository emailVerificationRepository;
     private final EmailService emailService;
+    private final JwtRedisService jwtRedisService;
 
     @Value("${google.client-id}")
     private String googleClientId;
@@ -69,6 +71,12 @@ public class AuthServiceImpl implements AuthService {
         String accessToken = jwtService.generateAccessToken(user);
         String refreshToken = jwtService.generateRefreshToken(user);
 
+        jwtRedisService.saveRefreshToken(
+                user.getEmail(),
+                refreshToken,
+                1000L * 60 * 60 * 24 * 7
+        );
+
         return AuthResponse.builder()
                 .email(user.getEmail())
                 .fullName(user.getFullName())
@@ -88,6 +96,12 @@ public class AuthServiceImpl implements AuthService {
 
         String accessToken = jwtService.generateAccessToken(user);
         String refreshToken = jwtService.generateRefreshToken(user);
+
+        jwtRedisService.saveRefreshToken(
+                user.getEmail(),
+                refreshToken,
+                1000L * 60 * 60 * 24 * 7
+        );
 
         return AuthResponse.builder()
                 .email(user.getEmail())
@@ -138,6 +152,12 @@ public class AuthServiceImpl implements AuthService {
 
             String accessToken = jwtService.generateAccessToken(user);
             String refreshToken = jwtService.generateRefreshToken(user);
+
+            jwtRedisService.saveRefreshToken(
+                    user.getEmail(),
+                    refreshToken,
+                    1000L * 60 * 60 * 24 * 7
+            );
 
             return AuthResponse.builder()
                     .email(user.getEmail())
@@ -219,6 +239,41 @@ public class AuthServiceImpl implements AuthService {
                 .email(user.getEmail())
                 .fullName(user.getFullName())
                 .accessToken(accessToken)
+                .refreshToken(refreshToken)
+                .build();
+    }
+
+    @Override
+    public void logout(String accessToken) {
+
+        String email = jwtService.extractEmail(accessToken);
+
+        jwtRedisService.blacklistToken(
+                accessToken,
+                1000L * 60 * 30 //30m
+        );
+
+        jwtRedisService.deleteRefreshToken(email);
+    }
+
+    @Override
+    public AuthResponse refreshToken(String refreshToken) {
+
+        String email = jwtService.extractEmail(refreshToken);
+
+        if (!jwtRedisService.isRefreshTokenValid(email, refreshToken)) {
+            throw new AppException(ErrorCode.UNAUTHORIZED);
+        }
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+
+        String newAccessToken = jwtService.generateAccessToken(user);
+
+        return AuthResponse.builder()
+                .email(user.getEmail())
+                .fullName(user.getFullName())
+                .accessToken(newAccessToken)
                 .refreshToken(refreshToken)
                 .build();
     }

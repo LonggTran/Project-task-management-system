@@ -10,4 +10,6 @@ public interface AuthService {
     AuthResponse loginWithGoogle(String idToken);
     void sendOtp(RegisterRequest request);
     AuthResponse verifyOtp(String email, String otp);
+    void logout(String accessToken);
+    AuthResponse refreshToken(String refreshToken);
 }

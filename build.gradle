@@ -52,8 +52,12 @@ dependencies {
 
     // Mail (send email)
     implementation 'org.springframework.boot:spring-boot-starter-mail'
-
     implementation 'com.google.api-client:google-api-client:2.2.0'
+
+	// redis (cache and token management
+	implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+	testImplementation 'org.springframework.boot:spring-boot-starter-data-redis-test'
+	implementation("io.lettuce:lettuce-core:7.5.0.RELEASE")
 }
 
 tasks.named('test') {

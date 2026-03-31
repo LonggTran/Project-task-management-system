@@ -1,6 +1,7 @@
 package com.projecttaskmanager.backend.securities;
 
 import com.projecttaskmanager.backend.models.User;
+import com.projecttaskmanager.backend.services.JwtRedisService;
 import com.projecttaskmanager.backend.services.JwtService;
 import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
@@ -22,6 +23,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
     private final CustomUserDetailsService userDetailsService;
+    private final JwtRedisService jwtRedisService;
 
     @Override
     protected void doFilterInternal(
@@ -38,6 +40,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         String jwt = authHeader.substring(7);
+
+        if (jwtRedisService.isTokenBlacklisted(jwt)) {
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            return;
+        }
 
         try {
 
