@@ -8,9 +8,9 @@ import java.util.List;
 import java.util.UUID;
 
 public interface EpicService {
-    EpicResponse create(CreateEpicRequest request);
-    EpicResponse update(UUID epicId, UpdateEpicRequest request);
-    void delete(UUID epicId);
+    EpicResponse create(CreateEpicRequest request, String email);
+    EpicResponse update(UUID epicId, UpdateEpicRequest request, String email);
+    void delete(UUID epicId, String email);
     EpicResponse getById(UUID epicId);
     List<EpicResponse> getAllByProject(UUID projectId);
 }

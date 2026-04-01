@@ -9,6 +9,7 @@ import com.projecttaskmanager.backend.services.TaskService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
@@ -24,11 +25,12 @@ public class TaskController {
     private final TaskService taskService;
 
     @PostMapping
-    public ResponseEntity<ApiResponse<TaskResponse>> create(@Valid @RequestBody CreateTaskRequest request) {
-        TaskResponse response = taskService.create(request);
+    public ResponseEntity<ApiResponse<TaskResponse>> create(
+            @Valid @RequestBody CreateTaskRequest request,
+            Authentication authentication) {
         return ResponseEntity.ok(ApiResponse.<TaskResponse>builder()
                 .success(true)
-                .data(response)
+                .data(taskService.create(request, authentication.getName()))
                 .timestamp(Instant.now())
                 .build());
     }
@@ -36,18 +38,18 @@ public class TaskController {
     @PutMapping("/{id}")
     public ResponseEntity<ApiResponse<TaskResponse>> update(
             @PathVariable UUID id,
-            @Valid @RequestBody UpdateTaskRequest request) {
-        TaskResponse response = taskService.update(id, request);
+            @Valid @RequestBody UpdateTaskRequest request,
+            Authentication authentication) {
         return ResponseEntity.ok(ApiResponse.<TaskResponse>builder()
                 .success(true)
-                .data(response)
+                .data(taskService.update(id, request, authentication.getName()))
                 .timestamp(Instant.now())
                 .build());
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<ApiResponse<Void>> delete(@PathVariable UUID id) {
-        taskService.delete(id);
+    public ResponseEntity<ApiResponse<Void>> delete(@PathVariable UUID id, Authentication authentication) {
+        taskService.delete(id, authentication.getName());
         return ResponseEntity.ok(ApiResponse.<Void>builder()
                 .success(true)
                 .message("Task deleted")
@@ -88,9 +90,9 @@ public class TaskController {
     @PostMapping("/{taskId}/labels")
     public ResponseEntity<ApiResponse<Void>> addLabelToTask(
             @PathVariable UUID taskId,
-            @RequestBody Map<String, UUID> request) {
+            @RequestBody Map<String, UUID> request, Authentication authentication) {
         UUID labelId = request.get("labelId");
-        taskService.addLabelToTask(taskId, labelId);
+        taskService.addLabelToTask(taskId, labelId, authentication.getName());
         return ResponseEntity.ok(ApiResponse.<Void>builder()
                 .success(true)
                 .message("Label added to task")
@@ -101,8 +103,8 @@ public class TaskController {
     @DeleteMapping("/{taskId}/labels/{labelId}")
     public ResponseEntity<ApiResponse<Void>> removeLabelFromTask(
             @PathVariable UUID taskId,
-            @PathVariable UUID labelId) {
-        taskService.removeLabelFromTask(taskId, labelId);
+            @PathVariable UUID labelId, Authentication authentication) {
+        taskService.removeLabelFromTask(taskId, labelId, authentication.getName());
         return ResponseEntity.ok(ApiResponse.<Void>builder()
                 .success(true)
                 .message("Label removed from task")

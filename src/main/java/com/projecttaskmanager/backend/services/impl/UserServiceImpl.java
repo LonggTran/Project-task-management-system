@@ -6,31 +6,39 @@ import com.projecttaskmanager.backend.exceptions.ErrorCode;
 import com.projecttaskmanager.backend.models.User;
 import com.projecttaskmanager.backend.repositories.UserRepository;
 import com.projecttaskmanager.backend.services.UserService;
+import com.projecttaskmanager.backend.services.RedisService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+
+import java.util.concurrent.TimeUnit;
 
 @Service
 @RequiredArgsConstructor
 public class UserServiceImpl implements UserService {
 
     private final UserRepository userRepository;
+    private final RedisService redisService;
+
+    private static final String CACHE_USER_ME = "user:me:";
 
     @Override
-    public UserResponse getCurrentUser() {
+    public UserResponse getCurrentUser(String email) {
+        String cacheKey = CACHE_USER_ME + email;
+        UserResponse cached = redisService.get(cacheKey, UserResponse.class);
 
-        String email = SecurityContextHolder.getContext()
-                .getAuthentication()
-                .getName();
+        if (cached != null) return cached;
 
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
-        return UserResponse.builder()
+        UserResponse response = UserResponse.builder()
                 .id(user.getId())
                 .email(user.getEmail())
                 .fullName(user.getFullName())
                 .avatarUrl(user.getAvatarUrl())
                 .build();
+
+        redisService.set(cacheKey, response, 30, TimeUnit.MINUTES);
+        return response;
     }
 }

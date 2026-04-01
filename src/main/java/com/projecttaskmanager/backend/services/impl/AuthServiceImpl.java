@@ -247,11 +247,9 @@ public class AuthServiceImpl implements AuthService {
     public void logout(String accessToken) {
 
         String email = jwtService.extractEmail(accessToken);
+        long ttl = jwtService.getRemainingTime(accessToken);
 
-        jwtRedisService.blacklistToken(
-                accessToken,
-                1000L * 60 * 30 //30m
-        );
+        jwtRedisService.blacklistToken(accessToken, ttl);
 
         jwtRedisService.deleteRefreshToken(email);
     }

@@ -9,13 +9,13 @@ import java.util.List;
 import java.util.UUID;
 
 public interface TaskService {
-    TaskResponse create(CreateTaskRequest request);
-    TaskResponse update(UUID taskId, UpdateTaskRequest request);
-    void delete(UUID taskId);
+    TaskResponse create(CreateTaskRequest request, String email);
+    TaskResponse update(UUID taskId, UpdateTaskRequest request, String email);
+    void delete(UUID taskId, String email);
     TaskResponse getById(UUID taskId);
     List<TaskResponse> getAllByProject(UUID projectId);
 
     List<LabelResponse> getTaskLabels(UUID taskId);
-    void addLabelToTask(UUID taskId, UUID labelId);
-    void removeLabelFromTask(UUID taskId, UUID labelId);
+    void addLabelToTask(UUID taskId, UUID labelId, String email);
+    void removeLabelFromTask(UUID taskId, UUID labelId, String email);
 }
