@@ -1,5 +1,6 @@
 package com.projecttaskmanager.backend.services.impl;
 
+import com.projecttaskmanager.backend.constants.CacheKey;
 import com.projecttaskmanager.backend.dto.request.project.CreateProjectRequest;
 import com.projecttaskmanager.backend.dto.request.project.UpdateProjectRequest;
 import com.projecttaskmanager.backend.dto.response.project.ProjectResponse;
@@ -34,8 +35,8 @@ public class ProjectServiceImpl implements ProjectService {
     private final ProjectMapper projectMapper;
     private final RedisService redisService;
 
-    private static final String CACHE_PROJECTS = "projects:user:";
-    private static final String CACHE_PROJECT_DETAIL = "project:id:";
+    private static final long LIST_CACHE_TTL = 10;
+    private static final long DETAIL_CACHE_TTL = 5;
 
     @Override
     @Transactional
@@ -67,19 +68,18 @@ public class ProjectServiceImpl implements ProjectService {
 
         projectMemberRepository.save(owner);
 
-        // Clear cache danh sách của user
-        redisService.delete(CACHE_PROJECTS + email);
+        redisService.delete(CacheKey.userProjects(email));
 
         return projectMapper.toResponse(project);
     }
 
     @Override
     public List<ProjectResponse> getAllProjects(String email) {
-        String cacheKey = CACHE_PROJECTS + email;
-        ProjectResponse[] cachedData = redisService.get(cacheKey, ProjectResponse[].class);
+        String cacheKey = CacheKey.userProjects(email);
 
-        if (cachedData != null) {
-            return Arrays.asList(cachedData);
+        ProjectResponse[] cached = redisService.get(cacheKey, ProjectResponse[].class);
+        if (cached != null) {
+            return Arrays.asList(cached);
         }
 
         User user = userRepository.findByEmail(email)
@@ -91,15 +91,16 @@ public class ProjectServiceImpl implements ProjectService {
                 .map(projectMapper::toResponse)
                 .toList();
 
-        redisService.set(cacheKey, projects, 10, TimeUnit.MINUTES);
+        redisService.set(cacheKey, projects, LIST_CACHE_TTL, TimeUnit.MINUTES);
+
         return projects;
     }
 
     @Override
     public ProjectResponse getProjectById(UUID id, String email) {
-        String cacheKey = CACHE_PROJECT_DETAIL + id;
-        ProjectResponse cached = redisService.get(cacheKey, ProjectResponse.class);
+        String cacheKey = CacheKey.projectDetail(id);
 
+        ProjectResponse cached = redisService.get(cacheKey, ProjectResponse.class);
         if (cached != null) return cached;
 
         authorizationService.checkProjectMember(id);
@@ -108,7 +109,8 @@ public class ProjectServiceImpl implements ProjectService {
                 .orElseThrow(() -> new AppException(ErrorCode.PROJECT_NOT_FOUND));
 
         ProjectResponse response = projectMapper.toResponse(project);
-        redisService.set(cacheKey, response, 5, TimeUnit.MINUTES);
+
+        redisService.set(cacheKey, response, DETAIL_CACHE_TTL, TimeUnit.MINUTES);
 
         return response;
     }
@@ -128,11 +130,10 @@ public class ProjectServiceImpl implements ProjectService {
         project.setIsArchived(request.getIsArchived());
 
         projectRepository.save(project);
+
         ProjectResponse response = projectMapper.toResponse(project);
 
-        // Invalidate caches
-        redisService.delete(CACHE_PROJECTS + email);
-        redisService.delete(CACHE_PROJECT_DETAIL + id);
+        invalidateProjectCaches(project);
 
         return response;
     }
@@ -145,11 +146,25 @@ public class ProjectServiceImpl implements ProjectService {
         Project project = projectRepository.findById(id)
                 .orElseThrow(() -> new AppException(ErrorCode.PROJECT_NOT_FOUND));
 
-        projectMemberRepository.deleteByProject(project);
+        List<ProjectMember> members = projectMemberRepository.findByProject(project);
+
+        projectMemberRepository.deleteAll(members);
         projectRepository.delete(project);
 
-        // Invalidate caches
-        redisService.delete(CACHE_PROJECTS + email);
-        redisService.delete(CACHE_PROJECT_DETAIL + id);
+        invalidateProjectCaches(project, members);
+    }
+
+    private void invalidateProjectCaches(Project project) {
+        List<ProjectMember> members = projectMemberRepository.findByProject(project);
+        invalidateProjectCaches(project, members);
+    }
+
+    private void invalidateProjectCaches(Project project, List<ProjectMember> members) {
+        redisService.delete(CacheKey.projectDetail(project.getId()));
+
+        for (ProjectMember member : members) {
+            String email = member.getUser().getEmail();
+            redisService.delete(CacheKey.userProjects(email));
+        }
     }
 }
