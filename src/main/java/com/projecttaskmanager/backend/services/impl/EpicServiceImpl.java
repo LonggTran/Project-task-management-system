@@ -1,5 +1,6 @@
 package com.projecttaskmanager.backend.services.impl;
 
+import com.projecttaskmanager.backend.constants.CacheKey;
 import com.projecttaskmanager.backend.dto.request.epic.CreateEpicRequest;
 import com.projecttaskmanager.backend.dto.request.epic.UpdateEpicRequest;
 import com.projecttaskmanager.backend.dto.response.epic.EpicResponse;
@@ -38,8 +39,8 @@ public class EpicServiceImpl implements EpicService {
     private final ActivityHelper activityHelper;
     private final RedisService redisService;
 
-    private static final String CACHE_EPIC_LIST = "epics:project:";
-    private static final String CACHE_EPIC_DETAIL = "epic:id:";
+    private static final long LIST_CACHE_TTL = 30;
+    private static final long DETAIL_CACHE_TTL = 10;
 
     @Override
     @Transactional
@@ -66,7 +67,7 @@ public class EpicServiceImpl implements EpicService {
         activityHelper.log(ActivityAction.EPIC_CREATED, "EPIC", saved.getId(),
                 project.getId(), "Created epic: " + saved.getName(), user.getId());
 
-        redisService.delete(CACHE_EPIC_LIST + project.getId());
+        redisService.delete(CacheKey.epicsByProject(project.getId()));
 
         return epicMapper.toResponse(saved);
     }
@@ -78,6 +79,7 @@ public class EpicServiceImpl implements EpicService {
         UUID projectId = epic.getProject().getId();
 
         authorizationService.checkPermission(projectId, "EPIC_UPDATE");
+
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
@@ -91,8 +93,8 @@ public class EpicServiceImpl implements EpicService {
         activityHelper.log(ActivityAction.EPIC_UPDATED, "EPIC", saved.getId(),
                 projectId, "Updated epic: " + saved.getName(), user.getId());
 
-        redisService.delete(CACHE_EPIC_DETAIL + epicId);
-        redisService.delete(CACHE_EPIC_LIST + projectId);
+        redisService.delete(CacheKey.epicDetail(epicId));
+        redisService.delete(CacheKey.epicsByProject(projectId));
 
         return epicMapper.toResponse(saved);
     }
@@ -104,6 +106,7 @@ public class EpicServiceImpl implements EpicService {
         UUID projectId = epic.getProject().getId();
 
         authorizationService.checkPermission(projectId, "EPIC_DELETE");
+
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
@@ -112,13 +115,13 @@ public class EpicServiceImpl implements EpicService {
         activityHelper.log(ActivityAction.EPIC_DELETED, "EPIC", epicId,
                 projectId, "Deleted epic: " + epic.getName(), user.getId());
 
-        redisService.delete(CACHE_EPIC_DETAIL + epicId);
-        redisService.delete(CACHE_EPIC_LIST + projectId);
+        redisService.delete(CacheKey.epicDetail(epicId));
+        redisService.delete(CacheKey.epicsByProject(projectId));
     }
 
     @Override
     public EpicResponse getById(UUID epicId) {
-        String cacheKey = CACHE_EPIC_DETAIL + epicId;
+        String cacheKey = CacheKey.epicDetail(epicId);
 
         EpicResponse cached = redisService.get(cacheKey, EpicResponse.class);
         if (cached != null) return cached;
@@ -128,14 +131,14 @@ public class EpicServiceImpl implements EpicService {
 
         EpicResponse response = epicMapper.toResponse(epic);
 
-        redisService.set(cacheKey, response, 10, TimeUnit.MINUTES);
+        redisService.set(cacheKey, response, DETAIL_CACHE_TTL, TimeUnit.MINUTES);
 
         return response;
     }
 
     @Override
     public List<EpicResponse> getAllByProject(UUID projectId) {
-        String cacheKey = CACHE_EPIC_LIST + projectId;
+        String cacheKey = CacheKey.epicsByProject(projectId);
 
         EpicResponse[] cachedData = redisService.get(cacheKey, EpicResponse[].class);
         if (cachedData != null) {
@@ -149,7 +152,7 @@ public class EpicServiceImpl implements EpicService {
                 .map(epicMapper::toResponse)
                 .toList();
 
-        redisService.set(cacheKey, epics, 30, TimeUnit.MINUTES);
+        redisService.set(cacheKey, epics, LIST_CACHE_TTL, TimeUnit.MINUTES);
 
         return epics;
     }

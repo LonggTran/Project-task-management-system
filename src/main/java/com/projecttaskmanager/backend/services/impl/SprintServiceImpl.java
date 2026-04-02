@@ -1,10 +1,12 @@
 package com.projecttaskmanager.backend.services.impl;
 
+import com.projecttaskmanager.backend.constants.CacheKey;
 import com.projecttaskmanager.backend.dto.request.sprint.AddTaskToSprintRequest;
 import com.projecttaskmanager.backend.dto.request.sprint.CreateSprintRequest;
 import com.projecttaskmanager.backend.dto.response.sprint.SprintResponse;
 import com.projecttaskmanager.backend.dto.response.sprint.SprintTaskResponse;
 import com.projecttaskmanager.backend.events.ActivityHelper;
+import com.projecttaskmanager.backend.events.NotificationEvent;
 import com.projecttaskmanager.backend.exceptions.AppException;
 import com.projecttaskmanager.backend.exceptions.ErrorCode;
 import com.projecttaskmanager.backend.mapper.SprintMapper;
@@ -14,15 +16,17 @@ import com.projecttaskmanager.backend.models.enums.ActivityAction;
 import com.projecttaskmanager.backend.models.enums.SprintStatus;
 import com.projecttaskmanager.backend.repositories.*;
 import com.projecttaskmanager.backend.services.ProjectAuthorizationService;
+import com.projecttaskmanager.backend.services.RedisService;
 import com.projecttaskmanager.backend.services.SprintService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
-import com.projecttaskmanager.backend.events.NotificationEvent;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 @Service
 @RequiredArgsConstructor
@@ -37,6 +41,7 @@ public class SprintServiceImpl implements SprintService {
     private final ProjectAuthorizationService auth;
     private final ActivityHelper activityHelper;
     private final ApplicationEventPublisher eventPublisher;
+    private final RedisService redisService;
 
     @Override
     public SprintResponse create(CreateSprintRequest request) {
@@ -55,6 +60,8 @@ public class SprintServiceImpl implements SprintService {
                 .build();
 
         Sprint saved = sprintRepository.save(sprint);
+
+        redisService.delete(CacheKey.sprintsByProject(project.getId()));
 
         activityHelper.log(
                 ActivityAction.SPRINT_CREATED,
@@ -88,16 +95,11 @@ public class SprintServiceImpl implements SprintService {
                         .build()
         );
 
-        activityHelper.log(
-                ActivityAction.SPRINT_STARTED,
-                "SPRINT",
-                sprint.getId(),
-                sprint.getProject().getId(),
-                "Sprint started",
-                null
-        );
+        Sprint saved = sprintRepository.save(sprint);
 
-        return sprintMapper.toResponse(sprintRepository.save(sprint));
+        invalidateSprintCache(saved);
+
+        return sprintMapper.toResponse(saved);
     }
 
     @Override
@@ -120,16 +122,11 @@ public class SprintServiceImpl implements SprintService {
                         .build()
         );
 
-        activityHelper.log(
-                ActivityAction.SPRINT_COMPLETED,
-                "SPRINT",
-                sprint.getId(),
-                sprint.getProject().getId(),
-                "Sprint completed",
-                null
-        );
+        Sprint saved = sprintRepository.save(sprint);
 
-        return sprintMapper.toResponse(sprintRepository.save(sprint));
+        invalidateSprintCache(saved);
+
+        return sprintMapper.toResponse(saved);
     }
 
     @Override
@@ -156,7 +153,11 @@ public class SprintServiceImpl implements SprintService {
                 .task(task)
                 .build();
 
-        return sprintTaskMapper.toResponse(sprintTaskRepository.save(st));
+        SprintTask saved = sprintTaskRepository.save(st);
+
+        redisService.delete(CacheKey.sprintTasks(sprint.getId()));
+
+        return sprintTaskMapper.toResponse(saved);
     }
 
     @Override
@@ -171,44 +172,67 @@ public class SprintServiceImpl implements SprintService {
 
         auth.checkPermission(st.getSprint().getProject().getId(), "SPRINT_UPDATE");
 
+        UUID sprintId = st.getSprint().getId();
+
         sprintTaskRepository.delete(st);
+
+        redisService.delete(CacheKey.sprintTasks(sprintId));
     }
 
     @Override
     public List<SprintResponse> getByProject(UUID projectId) {
+
+        String cacheKey = CacheKey.sprintsByProject(projectId);
+
+        SprintResponse[] cached = redisService.get(cacheKey, SprintResponse[].class);
+        if (cached != null) return Arrays.asList(cached);
 
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new AppException(ErrorCode.PROJECT_NOT_FOUND));
 
         auth.checkPermission(projectId, "SPRINT_VIEW");
 
-        return sprintRepository.findByProject(project)
+        List<SprintResponse> result = sprintRepository.findByProject(project)
                 .stream()
                 .map(sprintMapper::toResponse)
                 .toList();
+
+        redisService.set(cacheKey, result, 10, TimeUnit.MINUTES);
+
+        return result;
     }
 
     @Override
     public List<SprintTaskResponse> getSprintTasks(UUID sprintId) {
+
+        String cacheKey = CacheKey.sprintTasks(sprintId);
+
+        SprintTaskResponse[] cached = redisService.get(cacheKey, SprintTaskResponse[].class);
+        if (cached != null) return Arrays.asList(cached);
+
         Sprint sprint = sprintRepository.findById(sprintId)
                 .orElseThrow(() -> new AppException(ErrorCode.PROJECT_NOT_FOUND));
 
         auth.checkPermission(sprint.getProject().getId(), "SPRINT_VIEW");
 
-        return sprintTaskRepository.findBySprint(sprint)
+        List<SprintTaskResponse> result = sprintTaskRepository.findBySprint(sprint)
                 .stream()
                 .map(sprintTaskMapper::toResponse)
                 .toList();
+
+        redisService.set(cacheKey, result, 10, TimeUnit.MINUTES);
+
+        return result;
     }
 
     @Override
     public SprintResponse update(UUID sprintId, CreateSprintRequest request) {
+
         Sprint sprint = sprintRepository.findById(sprintId)
                 .orElseThrow(() -> new AppException(ErrorCode.SPRINT_NOT_FOUND));
 
         auth.checkPermission(sprint.getProject().getId(), "SPRINT_UPDATE");
 
-        // Không cho phép sửa sprint đã active hoặc closed
         if (sprint.getStatus() != SprintStatus.PLANNING) {
             throw new AppException(ErrorCode.SPRINT_CANNOT_UPDATE);
         }
@@ -219,14 +243,7 @@ public class SprintServiceImpl implements SprintService {
 
         Sprint saved = sprintRepository.save(sprint);
 
-        activityHelper.log(
-                ActivityAction.SPRINT_UPDATED,
-                "SPRINT",
-                saved.getId(),
-                sprint.getProject().getId(),
-                "Updated sprint: " + saved.getName(),
-                null
-        );
+        invalidateSprintCache(saved);
 
         return sprintMapper.toResponse(saved);
     }
@@ -234,12 +251,12 @@ public class SprintServiceImpl implements SprintService {
     @Override
     @Transactional
     public void delete(UUID sprintId) {
+
         Sprint sprint = sprintRepository.findById(sprintId)
                 .orElseThrow(() -> new AppException(ErrorCode.SPRINT_NOT_FOUND));
 
         auth.checkPermission(sprint.getProject().getId(), "SPRINT_DELETE");
 
-        // Không cho phép xóa sprint đã active hoặc closed
         if (sprint.getStatus() != SprintStatus.PLANNING) {
             throw new AppException(ErrorCode.SPRINT_CANNOT_DELETE);
         }
@@ -247,13 +264,12 @@ public class SprintServiceImpl implements SprintService {
         sprintTaskRepository.deleteBySprint(sprint);
         sprintRepository.delete(sprint);
 
-        activityHelper.log(
-                ActivityAction.SPRINT_DELETED,
-                "SPRINT",
-                sprint.getId(),
-                sprint.getProject().getId(),
-                "Deleted sprint: " + sprint.getName(),
-                null
-        );
+        invalidateSprintCache(sprint);
+    }
+
+    private void invalidateSprintCache(Sprint sprint) {
+        redisService.delete(CacheKey.sprintsByProject(sprint.getProject().getId()));
+        redisService.delete(CacheKey.sprintTasks(sprint.getId()));
+        redisService.delete(CacheKey.sprintDetail(sprint.getId()));
     }
 }

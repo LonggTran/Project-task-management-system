@@ -1,5 +1,6 @@
 package com.projecttaskmanager.backend.services.impl;
 
+import com.projecttaskmanager.backend.constants.CacheKey;
 import com.projecttaskmanager.backend.dto.request.task.CreateTaskRequest;
 import com.projecttaskmanager.backend.dto.request.task.UpdateTaskRequest;
 import com.projecttaskmanager.backend.dto.response.label.LabelResponse;
@@ -43,10 +44,9 @@ public class TaskServiceImpl implements TaskService {
     private final LabelRepository labelRepository;
     private final RedisService redisService;
 
-    // Định nghĩa các Prefix Cache
-    private static final String CACHE_TASK_LIST = "tasks:project:";
-    private static final String CACHE_TASK_DETAIL = "task:id:";
-    private static final String CACHE_TASK_LABELS = "task:labels:";
+    private static final long LIST_CACHE_TTL = 10;
+    private static final long DETAIL_CACHE_TTL = 5;
+    private static final long LABEL_CACHE_TTL = 20;
 
     @Override
     @Transactional
@@ -73,8 +73,7 @@ public class TaskServiceImpl implements TaskService {
 
         Task saved = taskRepository.save(task);
 
-        // Invalidate Cache danh sách task của project
-        redisService.delete(CACHE_TASK_LIST + project.getId());
+        redisService.delete(CacheKey.tasksByProject(project.getId()));
 
         activityHelper.log(ActivityAction.TASK_CREATED, "TASK", saved.getId(),
                 project.getId(), "Created task: " + saved.getTitle(), creator.getId());
@@ -91,7 +90,6 @@ public class TaskServiceImpl implements TaskService {
         User currentUser = getUserByEmail(email);
         TaskStatus oldStatus = task.getStatus();
 
-        // Cập nhật các trường cơ bản
         if (request.getTitle() != null) task.setTitle(request.getTitle());
         if (request.getDescription() != null) task.setDescription(request.getDescription());
         if (request.getPriority() != null) task.setPriority(request.getPriority());
@@ -99,7 +97,6 @@ public class TaskServiceImpl implements TaskService {
         if (request.getDueDate() != null) task.setDueDate(request.getDueDate());
         if (request.getEstimatedTime() != null) task.setEstimatedTime(request.getEstimatedTime());
 
-        // Xử lý trạng thái (Workflow)
         if (request.getStatusId() != null) {
             TaskStatus newStatus = taskStatusRepository.findById(request.getStatusId())
                     .orElseThrow(() -> new AppException(ErrorCode.TASK_NOT_FOUND));
@@ -115,7 +112,6 @@ public class TaskServiceImpl implements TaskService {
             }
         }
 
-        // Xử lý Epic & Parent Task
         if (request.getEpicId() != null) {
             Epic epic = epicRepository.findById(request.getEpicId())
                     .orElseThrow(() -> new AppException(ErrorCode.PROJECT_NOT_FOUND));
@@ -130,7 +126,6 @@ public class TaskServiceImpl implements TaskService {
 
         Task updated = taskRepository.save(task);
 
-        // XÓA CACHE: Phải xóa cả chi tiết và danh sách project
         invalidateTaskCache(taskId, updated.getProject().getId());
 
         activityHelper.log(ActivityAction.TASK_UPDATED, "TASK", updated.getId(),
@@ -144,14 +139,13 @@ public class TaskServiceImpl implements TaskService {
     public void delete(UUID taskId, String email) {
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new AppException(ErrorCode.TASK_NOT_FOUND));
+
         User user = getUserByEmail(email);
         UUID projectId = task.getProject().getId();
 
         taskRepository.delete(task);
 
-        // XÓA CACHE
         invalidateTaskCache(taskId, projectId);
-        redisService.delete(CACHE_TASK_LABELS + taskId);
 
         activityHelper.log(ActivityAction.TASK_DELETED, "TASK", taskId,
                 projectId, "Deleted task: " + task.getTitle(), user.getId());
@@ -159,7 +153,8 @@ public class TaskServiceImpl implements TaskService {
 
     @Override
     public TaskResponse getById(UUID taskId) {
-        String cacheKey = CACHE_TASK_DETAIL + taskId;
+        String cacheKey = CacheKey.taskDetail(taskId);
+
         TaskResponse cached = redisService.get(cacheKey, TaskResponse.class);
         if (cached != null) return cached;
 
@@ -167,13 +162,16 @@ public class TaskServiceImpl implements TaskService {
                 .orElseThrow(() -> new AppException(ErrorCode.TASK_NOT_FOUND));
 
         TaskResponse response = taskMapper.toResponse(task);
-        redisService.set(cacheKey, response, 5, TimeUnit.MINUTES);
+
+        redisService.set(cacheKey, response, DETAIL_CACHE_TTL, TimeUnit.MINUTES);
+
         return response;
     }
 
     @Override
     public List<TaskResponse> getAllByProject(UUID projectId) {
-        String cacheKey = CACHE_TASK_LIST + projectId;
+        String cacheKey = CacheKey.tasksByProject(projectId);
+
         TaskResponse[] cached = redisService.get(cacheKey, TaskResponse[].class);
         if (cached != null) return Arrays.asList(cached);
 
@@ -185,13 +183,15 @@ public class TaskServiceImpl implements TaskService {
                 .map(taskMapper::toResponse)
                 .toList();
 
-        redisService.set(cacheKey, tasks, 10, TimeUnit.MINUTES);
+        redisService.set(cacheKey, tasks, LIST_CACHE_TTL, TimeUnit.MINUTES);
+
         return tasks;
     }
 
     @Override
     public List<LabelResponse> getTaskLabels(UUID taskId) {
-        String cacheKey = CACHE_TASK_LABELS + taskId;
+        String cacheKey = CacheKey.taskLabels(taskId);
+
         LabelResponse[] cached = redisService.get(cacheKey, LabelResponse[].class);
         if (cached != null) return Arrays.asList(cached);
 
@@ -202,7 +202,8 @@ public class TaskServiceImpl implements TaskService {
                 .map(labelMapper::toResponse)
                 .toList();
 
-        redisService.set(cacheKey, labels, 20, TimeUnit.MINUTES);
+        redisService.set(cacheKey, labels, LABEL_CACHE_TTL, TimeUnit.MINUTES);
+
         return labels;
     }
 
@@ -211,8 +212,10 @@ public class TaskServiceImpl implements TaskService {
     public void addLabelToTask(UUID taskId, UUID labelId, String email) {
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new AppException(ErrorCode.TASK_NOT_FOUND));
+
         Label label = labelRepository.findById(labelId)
                 .orElseThrow(() -> new AppException(ErrorCode.VALIDATION_ERROR));
+
         User currentUser = getUserByEmail(email);
 
         if (!label.getProject().getId().equals(task.getProject().getId())) {
@@ -222,9 +225,7 @@ public class TaskServiceImpl implements TaskService {
         task.getLabels().add(label);
         taskRepository.save(task);
 
-        // Invalidate cache
         invalidateTaskCache(taskId, task.getProject().getId());
-        redisService.delete(CACHE_TASK_LABELS + taskId);
 
         activityHelper.log(ActivityAction.TASK_UPDATED, "TASK", task.getId(),
                 task.getProject().getId(), "Added label: " + label.getName(), currentUser.getId());
@@ -235,22 +236,20 @@ public class TaskServiceImpl implements TaskService {
     public void removeLabelFromTask(UUID taskId, UUID labelId, String email) {
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new AppException(ErrorCode.TASK_NOT_FOUND));
+
         Label label = labelRepository.findById(labelId)
                 .orElseThrow(() -> new AppException(ErrorCode.VALIDATION_ERROR));
+
         User currentUser = getUserByEmail(email);
 
         task.getLabels().remove(label);
         taskRepository.save(task);
 
-        // Invalidate cache
         invalidateTaskCache(taskId, task.getProject().getId());
-        redisService.delete(CACHE_TASK_LABELS + taskId);
 
         activityHelper.log(ActivityAction.TASK_UPDATED, "TASK", task.getId(),
                 task.getProject().getId(), "Removed label: " + label.getName(), currentUser.getId());
     }
-
-    // ================= HELPER METHODS =================
 
     private User getUserByEmail(String email) {
         return userRepository.findByEmail(email)
@@ -258,8 +257,9 @@ public class TaskServiceImpl implements TaskService {
     }
 
     private void invalidateTaskCache(UUID taskId, UUID projectId) {
-        redisService.delete(CACHE_TASK_DETAIL + taskId);
-        redisService.delete(CACHE_TASK_LIST + projectId);
+        redisService.delete(CacheKey.taskDetail(taskId));
+        redisService.delete(CacheKey.tasksByProject(projectId));
+        redisService.delete(CacheKey.taskLabels(taskId));
     }
 
     private void publishStatusChangeEvent(Task task, User actor, TaskStatus oldS, TaskStatus newS) {
