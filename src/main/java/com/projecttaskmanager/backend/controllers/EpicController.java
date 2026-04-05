@@ -25,7 +25,7 @@ public class EpicController {
     @PostMapping
     public ResponseEntity<ApiResponse<EpicResponse>> create(
             @Valid @RequestBody CreateEpicRequest request,
-            Authentication authentication // Thêm ở đây
+            Authentication authentication
     ) {
         return ResponseEntity.ok(ApiResponse.<EpicResponse>builder()
                 .success(true)

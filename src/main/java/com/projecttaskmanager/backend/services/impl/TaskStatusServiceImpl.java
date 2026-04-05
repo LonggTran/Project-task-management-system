@@ -1,15 +1,18 @@
 package com.projecttaskmanager.backend.services.impl;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.projecttaskmanager.backend.constants.CacheKey;
 import com.projecttaskmanager.backend.dto.request.task.CreateTaskStatusRequest;
 import com.projecttaskmanager.backend.dto.request.task.UpdateTaskStatusRequest;
 import com.projecttaskmanager.backend.dto.response.task.TaskStatusResponse;
 import com.projecttaskmanager.backend.exceptions.AppException;
 import com.projecttaskmanager.backend.exceptions.ErrorCode;
+import com.projecttaskmanager.backend.helpers.EntityHelper;
 import com.projecttaskmanager.backend.mapper.TaskStatusMapper;
 import com.projecttaskmanager.backend.models.Project;
 import com.projecttaskmanager.backend.models.TaskStatus;
-import com.projecttaskmanager.backend.repositories.ProjectRepository;
 import com.projecttaskmanager.backend.repositories.TaskStatusRepository;
+import com.projecttaskmanager.backend.services.RedisService;
 import com.projecttaskmanager.backend.services.TaskStatusService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -18,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 @Service
 @RequiredArgsConstructor
@@ -25,13 +29,13 @@ public class TaskStatusServiceImpl implements TaskStatusService {
 
     private final TaskStatusRepository taskStatusRepository;
     private final TaskStatusMapper taskStatusMapper;
-    private final ProjectRepository projectRepository;
+    private final EntityHelper entityHelper;
+    private final RedisService redisService;
 
     @Override
     public TaskStatusResponse create(UUID projectId, CreateTaskStatusRequest request) {
 
-        Project project = projectRepository.findById(projectId)
-                .orElseThrow(() -> new AppException(ErrorCode.PROJECT_NOT_FOUND));
+        Project project = entityHelper.getProjectOrThrow(projectId);
 
         if (Boolean.TRUE.equals(request.getIsDefault())) {
             taskStatusRepository.findByIsDefaultTrueAndProject(project).ifPresent(old -> {
@@ -46,8 +50,8 @@ public class TaskStatusServiceImpl implements TaskStatusService {
 
         Integer sort = request.getSort();
         if (sort == null) {
-            List<TaskStatus> existingStatuses = taskStatusRepository.findByProjectOrderBySortAsc(project);
-            sort = existingStatuses.isEmpty() ? 1 : existingStatuses.get(existingStatuses.size() - 1).getSort() + 1;
+            List<TaskStatus> existing = taskStatusRepository.findByProjectOrderBySortAsc(project);
+            sort = existing.isEmpty() ? 1 : existing.get(existing.size() - 1).getSort() + 1;
         }
 
         TaskStatus status = TaskStatus.builder()
@@ -58,14 +62,17 @@ public class TaskStatusServiceImpl implements TaskStatusService {
                 .project(project)
                 .build();
 
-        return taskStatusMapper.toResponse(taskStatusRepository.save(status));
+        TaskStatus saved = taskStatusRepository.save(status);
+
+        invalidateCache(projectId, saved.getId());
+
+        return taskStatusMapper.toResponse(saved);
     }
 
     @Override
     public TaskStatusResponse update(UUID id, UpdateTaskStatusRequest request) {
 
-        TaskStatus status = taskStatusRepository.findById(id)
-                .orElseThrow(() -> new AppException(ErrorCode.TASK_NOT_FOUND));
+        TaskStatus status = entityHelper.getTaskStatusOrThrow(id);
 
         if (Boolean.TRUE.equals(request.getIsDefault())) {
             taskStatusRepository.findByIsDefaultTrueAndProject(status.getProject()).ifPresent(old -> {
@@ -81,38 +88,25 @@ public class TaskStatusServiceImpl implements TaskStatusService {
         if (request.getIsDefault() != null) status.setIsDefault(request.getIsDefault());
         if (request.getOrder() != null) status.setSort(request.getOrder());
 
-        return taskStatusMapper.toResponse(taskStatusRepository.save(status));
+        TaskStatus saved = taskStatusRepository.save(status);
+
+        invalidateCache(status.getProject().getId(), id);
+
+        return taskStatusMapper.toResponse(saved);
     }
 
     @Override
     public void delete(UUID id) {
-        TaskStatus status = taskStatusRepository.findById(id)
-                .orElseThrow(() -> new AppException(ErrorCode.TASK_NOT_FOUND));
+
+        TaskStatus status = entityHelper.getTaskStatusOrThrow(id);
 
         if (Boolean.TRUE.equals(status.getIsDefault())) {
             throw new AppException(ErrorCode.VALIDATION_ERROR);
         }
 
         taskStatusRepository.delete(status);
-    }
 
-    @Override
-    public TaskStatusResponse getById(UUID id) {
-        TaskStatus status = taskStatusRepository.findById(id)
-                .orElseThrow(() -> new AppException(ErrorCode.TASK_NOT_FOUND));
-
-        return taskStatusMapper.toResponse(status);
-    }
-
-    @Override
-    public List<TaskStatusResponse> getByProject(UUID projectId) {
-        Project project = projectRepository.findById(projectId)
-                .orElseThrow(() -> new AppException(ErrorCode.PROJECT_NOT_FOUND));
-
-        return taskStatusRepository.findByProjectOrderBySortAsc(project)
-                .stream()
-                .map(taskStatusMapper::toResponse)
-                .toList();
+        invalidateCache(status.getProject().getId(), id);
     }
 
     @Override
@@ -124,28 +118,72 @@ public class TaskStatusServiceImpl implements TaskStatusService {
     }
 
     @Override
+    public TaskStatusResponse getById(UUID id) {
+
+        String key = CacheKey.taskStatus(id);
+
+        return redisService.getOrLoad(
+                key,
+                new TypeReference<TaskStatusResponse>() {},
+                () -> taskStatusMapper.toResponse(
+                        entityHelper.getTaskStatusOrThrow(id)
+                ),
+                10, TimeUnit.MINUTES
+        );
+    }
+
+    @Override
+    public List<TaskStatusResponse> getByProject(UUID projectId) {
+
+        String key = CacheKey.taskStatuses(projectId);
+
+        return redisService.getOrLoad(
+                key,
+                new TypeReference<List<TaskStatusResponse>>() {},
+                () -> {
+                    Project project = entityHelper.getProjectOrThrow(projectId);
+
+                    return taskStatusRepository.findByProjectOrderBySortAsc(project)
+                            .stream()
+                            .map(taskStatusMapper::toResponse)
+                            .toList();
+                },
+                10, TimeUnit.MINUTES
+        );
+    }
+
+    @Override
     public TaskStatusResponse getDefaultStatus(UUID projectId) {
-        Project project = projectRepository.findById(projectId)
-                .orElseThrow(() -> new AppException(ErrorCode.PROJECT_NOT_FOUND));
 
-        TaskStatus defaultStatus = taskStatusRepository.findByIsDefaultTrueAndProject(project)
-                .orElseThrow(() -> new AppException(ErrorCode.TASK_NOT_FOUND));
+        String key = CacheKey.defaultTaskStatus(projectId);
 
-        return taskStatusMapper.toResponse(defaultStatus);
+        return redisService.getOrLoad(
+                key,
+                new TypeReference<TaskStatusResponse>() {},
+                () -> {
+                    Project project = entityHelper.getProjectOrThrow(projectId);
+
+                    TaskStatus defaultStatus = taskStatusRepository
+                            .findByProjectIdAndIsDefaultTrue(projectId)
+                            .orElseThrow(() -> new AppException(ErrorCode.TASK_NOT_FOUND));
+
+                    return taskStatusMapper.toResponse(defaultStatus);
+                },
+                10, TimeUnit.MINUTES
+        );
     }
 
     @Override
     @Transactional
     public void reorderStatuses(UUID projectId, List<Map<String, Object>> statuses) {
-        Project project = projectRepository.findById(projectId)
-                .orElseThrow(() -> new AppException(ErrorCode.PROJECT_NOT_FOUND));
 
-        for (Map<String, Object> statusData : statuses) {
-            UUID statusId = UUID.fromString((String) statusData.get("id"));
-            Integer sort = (Integer) statusData.get("sort");
+        entityHelper.getProjectOrThrow(projectId);
 
-            TaskStatus status = taskStatusRepository.findById(statusId)
-                    .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
+        for (Map<String, Object> s : statuses) {
+            UUID id = UUID.fromString((String) s.get("id"));
+            Integer sort = (Integer) s.get("sort");
+
+            TaskStatus status = entityHelper.getTaskStatusOrThrow(id);
 
             if (!status.getProject().getId().equals(projectId)) {
                 throw new AppException(ErrorCode.FORBIDDEN);
@@ -154,5 +192,13 @@ public class TaskStatusServiceImpl implements TaskStatusService {
             status.setSort(sort);
             taskStatusRepository.save(status);
         }
+
+        redisService.delete(CacheKey.taskStatuses(projectId));
+    }
+
+    private void invalidateCache(UUID projectId, UUID statusId) {
+        redisService.delete(CacheKey.taskStatuses(projectId));
+        redisService.delete(CacheKey.defaultTaskStatus(projectId));
+        redisService.delete(CacheKey.taskStatus(statusId));
     }
 }

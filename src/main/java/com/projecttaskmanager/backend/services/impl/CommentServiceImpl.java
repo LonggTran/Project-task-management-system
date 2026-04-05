@@ -1,55 +1,53 @@
 package com.projecttaskmanager.backend.services.impl;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.projecttaskmanager.backend.constants.CacheKey;
 import com.projecttaskmanager.backend.dto.request.task.CreateCommentRequest;
 import com.projecttaskmanager.backend.dto.response.task.CommentResponse;
 import com.projecttaskmanager.backend.events.ActivityHelper;
-import com.projecttaskmanager.backend.exceptions.AppException;
-import com.projecttaskmanager.backend.exceptions.ErrorCode;
+import com.projecttaskmanager.backend.helpers.EntityHelper;
 import com.projecttaskmanager.backend.mapper.CommentMapper;
 import com.projecttaskmanager.backend.models.Comment;
 import com.projecttaskmanager.backend.models.Task;
-import com.projecttaskmanager.backend.models.TaskAssignee;
 import com.projecttaskmanager.backend.models.User;
 import com.projecttaskmanager.backend.models.enums.ActivityAction;
 import com.projecttaskmanager.backend.repositories.CommentRepository;
-import com.projecttaskmanager.backend.repositories.TaskAssigneeRepository;
-import com.projecttaskmanager.backend.repositories.TaskRepository;
-import com.projecttaskmanager.backend.repositories.UserRepository;
 import com.projecttaskmanager.backend.services.CommentService;
 import com.projecttaskmanager.backend.services.ProjectAuthorizationService;
+import com.projecttaskmanager.backend.services.RedisService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
-import com.projecttaskmanager.backend.events.NotificationEvent;
 
 import java.util.List;
 import java.util.UUID;
-import java.util.stream.Collectors;
+import java.util.concurrent.TimeUnit;
 
 @Service
 @RequiredArgsConstructor
 public class CommentServiceImpl implements CommentService {
 
     private final CommentRepository commentRepository;
-    private final TaskRepository taskRepository;
-    private final UserRepository userRepository;
+    private final EntityHelper entityHelper;
     private final ProjectAuthorizationService authorizationService;
     private final CommentMapper commentMapper;
     private final ActivityHelper activityHelper;
-    private final ApplicationEventPublisher eventPublisher; // Thêm field này
-    private final TaskAssigneeRepository taskAssigneeRepository;
+    private final ApplicationEventPublisher eventPublisher;
+    private final RedisService redisService;
+
+    private static final long LIST_CACHE_TTL = 10;
+    private static final long DETAIL_CACHE_TTL = 5;
 
     @Override
     public CommentResponse createComment(UUID taskId, CreateCommentRequest request) {
-        Task task = taskRepository.findById(taskId)
-                .orElseThrow(() -> new AppException(ErrorCode.TASK_NOT_FOUND));
+
+        Task task = entityHelper.getTaskOrThrow(taskId);
 
         authorizationService.checkPermission(task.getProject().getId(), "COMMENT_CREATE");
 
-        User user = userRepository.findByEmail(
-                SecurityContextHolder.getContext().getAuthentication().getName()
-        ).orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        User user = entityHelper.getUserOrThrow(email);
 
         Comment comment = Comment.builder()
                 .task(task)
@@ -59,26 +57,7 @@ public class CommentServiceImpl implements CommentService {
 
         Comment saved = commentRepository.save(comment);
 
-//        List<User> assignees = taskAssigneeRepository.findByTask(task)
-//                .stream()
-//                .map(TaskAssignee::getUser)
-//                .filter(assignee -> !assignee.getId().equals(user.getId())) // Không thông báo cho người comment
-//                .toList();
-//
-//        for (User assignee : assignees) {
-//            eventPublisher.publishEvent(
-//                    NotificationEvent.builder()
-//                            .receiverId(assignee.getId())
-//                            .projectId(task.getProject().getId())
-//                            .title("Bình luận mới")
-//                            .content(String.format("%s đã bình luận về task: %s",
-//                                    user.getFullName(), task.getTitle()))
-//                            .type("COMMENT_ADDED")
-//                            .referenceId(task.getId())
-//                            .actorId(user.getId())
-//                            .build()
-//            );
-//        }
+        redisService.delete(CacheKey.commentsByTask(taskId));
 
         activityHelper.log(
                 ActivityAction.COMMENT_CREATED,
@@ -94,65 +73,103 @@ public class CommentServiceImpl implements CommentService {
 
     @Override
     public CommentResponse updateComment(UUID commentId, CreateCommentRequest request) {
-        Comment comment = commentRepository.findById(commentId)
-                .orElseThrow(() -> new AppException(ErrorCode.TASK_NOT_FOUND));
+
+        Comment comment = entityHelper.getCommentOrThrow(commentId);
 
         authorizationService.checkPermission(comment.getTask().getProject().getId(), "COMMENT_UPDATE");
 
         comment.setContent(request.getContent());
 
-        Comment saved = commentRepository.save(comment);
+        comment = commentRepository.save(comment);
+
+        invalidateCommentCache(commentId, comment.getTask().getId());
 
         activityHelper.log(
                 ActivityAction.COMMENT_UPDATED,
                 "COMMENT",
-                saved.getId(),
+                comment.getId(),
                 comment.getTask().getProject().getId(),
                 "Comment updated",
                 comment.getUser().getId()
         );
-        return commentMapper.toResponse(saved);
+
+        return commentMapper.toResponse(comment);
     }
 
     @Override
     public void deleteComment(UUID commentId) {
-        Comment comment = commentRepository.findById(commentId)
-                .orElseThrow(() -> new AppException(ErrorCode.TASK_NOT_FOUND));
+
+        Comment comment = entityHelper.getCommentOrThrow(commentId);
 
         authorizationService.checkPermission(comment.getTask().getProject().getId(), "COMMENT_DELETE");
+
+        UUID taskId = comment.getTask().getId();
+
+        commentRepository.delete(comment);
+
+        invalidateCommentCache(commentId, taskId);
 
         activityHelper.log(
                 ActivityAction.COMMENT_DELETED,
                 "COMMENT",
-                comment.getId(),
+                commentId,
                 comment.getTask().getProject().getId(),
                 "Comment deleted",
                 comment.getUser().getId()
         );
-
-        commentRepository.delete(comment);
     }
 
     @Override
     public List<CommentResponse> getCommentsByTask(UUID taskId) {
-        Task task = taskRepository.findById(taskId)
-                .orElseThrow(() -> new AppException(ErrorCode.TASK_NOT_FOUND));
 
-        authorizationService.checkPermission(task.getProject().getId(), "COMMENT_VIEW");
+        String cacheKey = CacheKey.commentsByTask(taskId);
 
-        return commentRepository.findAllByTask(task)
-                .stream()
-                .map(commentMapper::toResponse)
-                .collect(Collectors.toList());
+        return redisService.getOrLoad(
+                cacheKey,
+                new TypeReference<List<CommentResponse>>() {},
+                () -> {
+                    Task task = entityHelper.getTaskOrThrow(taskId);
+
+                    authorizationService.checkPermission(
+                            task.getProject().getId(),
+                            "COMMENT_VIEW"
+                    );
+
+                    return commentRepository.findAllByTask(task)
+                            .stream()
+                            .map(commentMapper::toResponse)
+                            .toList();
+                },
+                LIST_CACHE_TTL,
+                TimeUnit.MINUTES
+        );
     }
 
     @Override
     public CommentResponse getCommentById(UUID commentId) {
-        Comment comment = commentRepository.findById(commentId)
-                .orElseThrow(() -> new AppException(ErrorCode.TASK_NOT_FOUND));
 
-        authorizationService.checkPermission(comment.getTask().getProject().getId(), "COMMENT_VIEW");
+        String cacheKey = CacheKey.commentDetail(commentId);
 
-        return commentMapper.toResponse(comment);
+        return redisService.getOrLoad(
+                cacheKey,
+                CommentResponse.class,
+                () -> {
+                    Comment comment = entityHelper.getCommentOrThrow(commentId);
+
+                    authorizationService.checkPermission(
+                            comment.getTask().getProject().getId(),
+                            "COMMENT_VIEW"
+                    );
+
+                    return commentMapper.toResponse(comment);
+                },
+                DETAIL_CACHE_TTL,
+                TimeUnit.MINUTES
+        );
+    }
+
+    private void invalidateCommentCache(UUID commentId, UUID taskId) {
+        redisService.delete(CacheKey.commentDetail(commentId));
+        redisService.delete(CacheKey.commentsByTask(taskId));
     }
 }
