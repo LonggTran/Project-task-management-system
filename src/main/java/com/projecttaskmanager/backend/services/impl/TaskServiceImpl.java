@@ -1,5 +1,6 @@
 package com.projecttaskmanager.backend.services.impl;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.projecttaskmanager.backend.constants.CacheKey;
 import com.projecttaskmanager.backend.dto.request.task.CreateTaskRequest;
 import com.projecttaskmanager.backend.dto.request.task.UpdateTaskRequest;
@@ -9,11 +10,12 @@ import com.projecttaskmanager.backend.events.NotificationEvent;
 import com.projecttaskmanager.backend.events.ActivityHelper;
 import com.projecttaskmanager.backend.exceptions.AppException;
 import com.projecttaskmanager.backend.exceptions.ErrorCode;
+import com.projecttaskmanager.backend.helpers.EntityHelper;
 import com.projecttaskmanager.backend.mapper.LabelMapper;
 import com.projecttaskmanager.backend.mapper.TaskMapper;
 import com.projecttaskmanager.backend.models.*;
 import com.projecttaskmanager.backend.models.enums.ActivityAction;
-import com.projecttaskmanager.backend.repositories.*;
+import com.projecttaskmanager.backend.repositories.TaskRepository;
 import com.projecttaskmanager.backend.services.RedisService;
 import com.projecttaskmanager.backend.services.TaskService;
 import com.projecttaskmanager.backend.services.WorkflowService;
@@ -22,7 +24,6 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -31,18 +32,14 @@ import java.util.concurrent.TimeUnit;
 @RequiredArgsConstructor
 public class TaskServiceImpl implements TaskService {
 
-    private final TaskRepository taskRepository;
-    private final ProjectRepository projectRepository;
-    private final UserRepository userRepository;
-    private final TaskStatusRepository taskStatusRepository;
+    private final EntityHelper entityHelper;
     private final WorkflowService workflowService;
     private final TaskMapper taskMapper;
+    private final LabelMapper labelMapper;
     private final ActivityHelper activityHelper;
     private final ApplicationEventPublisher eventPublisher;
-    private final EpicRepository epicRepository;
-    private final LabelMapper labelMapper;
-    private final LabelRepository labelRepository;
     private final RedisService redisService;
+    private final TaskRepository taskRepository;
 
     private static final long LIST_CACHE_TTL = 10;
     private static final long DETAIL_CACHE_TTL = 5;
@@ -51,13 +48,10 @@ public class TaskServiceImpl implements TaskService {
     @Override
     @Transactional
     public TaskResponse create(CreateTaskRequest request, String email) {
-        Project project = projectRepository.findById(request.getProjectId())
-                .orElseThrow(() -> new AppException(ErrorCode.PROJECT_NOT_FOUND));
 
-        TaskStatus status = taskStatusRepository.findById(request.getStatusId())
-                .orElseThrow(() -> new AppException(ErrorCode.TASK_NOT_FOUND));
-
-        User creator = getUserByEmail(email);
+        Project project = entityHelper.getProjectOrThrow(request.getProjectId());
+        TaskStatus status = entityHelper.getTaskStatusOrThrow(request.getStatusId());
+        User creator = entityHelper.getUserOrThrow(email);
 
         Task task = Task.builder()
                 .title(request.getTitle())
@@ -84,10 +78,9 @@ public class TaskServiceImpl implements TaskService {
     @Override
     @Transactional
     public TaskResponse update(UUID taskId, UpdateTaskRequest request, String email) {
-        Task task = taskRepository.findById(taskId)
-                .orElseThrow(() -> new AppException(ErrorCode.TASK_NOT_FOUND));
 
-        User currentUser = getUserByEmail(email);
+        Task task = entityHelper.getTaskOrThrow(taskId);
+        User currentUser = entityHelper.getUserOrThrow(email);
         TaskStatus oldStatus = task.getStatus();
 
         if (request.getTitle() != null) task.setTitle(request.getTitle());
@@ -98,8 +91,7 @@ public class TaskServiceImpl implements TaskService {
         if (request.getEstimatedTime() != null) task.setEstimatedTime(request.getEstimatedTime());
 
         if (request.getStatusId() != null) {
-            TaskStatus newStatus = taskStatusRepository.findById(request.getStatusId())
-                    .orElseThrow(() -> new AppException(ErrorCode.TASK_NOT_FOUND));
+            TaskStatus newStatus = entityHelper.getTaskStatusOrThrow(request.getStatusId());
 
             if (workflowService.hasWorkflow(task.getProject().getId())) {
                 workflowService.validateTransition(task.getProject().getId(), oldStatus, newStatus);
@@ -113,37 +105,31 @@ public class TaskServiceImpl implements TaskService {
         }
 
         if (request.getEpicId() != null) {
-            Epic epic = epicRepository.findById(request.getEpicId())
-                    .orElseThrow(() -> new AppException(ErrorCode.PROJECT_NOT_FOUND));
-            task.setEpic(epic);
+            task.setEpic(entityHelper.getEpicOrThrow(request.getEpicId()));
         }
 
         if (request.getParentTaskId() != null) {
-            Task parentTask = taskRepository.findById(request.getParentTaskId())
-                    .orElseThrow(() -> new AppException(ErrorCode.TASK_NOT_FOUND));
-            task.setParentTask(parentTask);
+            task.setParentTask(entityHelper.getTaskOrThrow(request.getParentTaskId()));
         }
 
-        Task updated = taskRepository.save(task);
+        Task saved = taskRepository.save(task);
 
-        invalidateTaskCache(taskId, updated.getProject().getId());
+        invalidateTaskCache(taskId, saved.getProject().getId());
 
-        activityHelper.log(ActivityAction.TASK_UPDATED, "TASK", updated.getId(),
-                updated.getProject().getId(), "Updated task: " + updated.getTitle(), currentUser.getId());
+        activityHelper.log(ActivityAction.TASK_UPDATED, "TASK", saved.getId(),
+                saved.getProject().getId(), "Updated task: " + saved.getTitle(), currentUser.getId());
 
-        return taskMapper.toResponse(updated);
+        return taskMapper.toResponse(saved);
     }
 
     @Override
     @Transactional
     public void delete(UUID taskId, String email) {
-        Task task = taskRepository.findById(taskId)
-                .orElseThrow(() -> new AppException(ErrorCode.TASK_NOT_FOUND));
 
-        User user = getUserByEmail(email);
+        Task task = entityHelper.getTaskOrThrow(taskId);
+        User user = entityHelper.getUserOrThrow(email);
+
         UUID projectId = task.getProject().getId();
-
-        taskRepository.delete(task);
 
         invalidateTaskCache(taskId, projectId);
 
@@ -153,107 +139,82 @@ public class TaskServiceImpl implements TaskService {
 
     @Override
     public TaskResponse getById(UUID taskId) {
-        String cacheKey = CacheKey.taskDetail(taskId);
 
-        TaskResponse cached = redisService.get(cacheKey, TaskResponse.class);
-        if (cached != null) return cached;
-
-        Task task = taskRepository.findById(taskId)
-                .orElseThrow(() -> new AppException(ErrorCode.TASK_NOT_FOUND));
-
-        TaskResponse response = taskMapper.toResponse(task);
-
-        redisService.set(cacheKey, response, DETAIL_CACHE_TTL, TimeUnit.MINUTES);
-
-        return response;
+        return redisService.getOrLoad(
+                CacheKey.taskDetail(taskId),
+                TaskResponse.class,
+                () -> taskMapper.toResponse(entityHelper.getTaskOrThrow(taskId)),
+                DETAIL_CACHE_TTL,
+                TimeUnit.MINUTES
+        );
     }
 
     @Override
     public List<TaskResponse> getAllByProject(UUID projectId) {
-        String cacheKey = CacheKey.tasksByProject(projectId);
 
-        TaskResponse[] cached = redisService.get(cacheKey, TaskResponse[].class);
-        if (cached != null) return Arrays.asList(cached);
-
-        Project project = projectRepository.findById(projectId)
-                .orElseThrow(() -> new AppException(ErrorCode.PROJECT_NOT_FOUND));
-
-        List<TaskResponse> tasks = taskRepository.findAllByProject(project)
-                .stream()
-                .map(taskMapper::toResponse)
-                .toList();
-
-        redisService.set(cacheKey, tasks, LIST_CACHE_TTL, TimeUnit.MINUTES);
-
-        return tasks;
+        return redisService.getOrLoad(
+                CacheKey.tasksByProject(projectId),
+                new TypeReference<List<TaskResponse>>() {},
+                () -> entityHelper.getProjectOrThrow(projectId)
+                        .getTasks()
+                        .stream()
+                        .map(taskMapper::toResponse)
+                        .toList(),
+                LIST_CACHE_TTL,
+                TimeUnit.MINUTES
+        );
     }
 
     @Override
     public List<LabelResponse> getTaskLabels(UUID taskId) {
-        String cacheKey = CacheKey.taskLabels(taskId);
 
-        LabelResponse[] cached = redisService.get(cacheKey, LabelResponse[].class);
-        if (cached != null) return Arrays.asList(cached);
-
-        Task task = taskRepository.findById(taskId)
-                .orElseThrow(() -> new AppException(ErrorCode.TASK_NOT_FOUND));
-
-        List<LabelResponse> labels = task.getLabels().stream()
-                .map(labelMapper::toResponse)
-                .toList();
-
-        redisService.set(cacheKey, labels, LABEL_CACHE_TTL, TimeUnit.MINUTES);
-
-        return labels;
+        return redisService.getOrLoad(
+                CacheKey.taskLabels(taskId),
+                new TypeReference<List<LabelResponse>>() {},
+                () -> entityHelper.getTaskOrThrow(taskId)
+                        .getLabels()
+                        .stream()
+                        .map(labelMapper::toResponse)
+                        .toList(),
+                LABEL_CACHE_TTL,
+                TimeUnit.MINUTES
+        );
     }
 
     @Override
     @Transactional
     public void addLabelToTask(UUID taskId, UUID labelId, String email) {
-        Task task = taskRepository.findById(taskId)
-                .orElseThrow(() -> new AppException(ErrorCode.TASK_NOT_FOUND));
 
-        Label label = labelRepository.findById(labelId)
-                .orElseThrow(() -> new AppException(ErrorCode.VALIDATION_ERROR));
-
-        User currentUser = getUserByEmail(email);
+        Task task = entityHelper.getTaskOrThrow(taskId);
+        Label label = entityHelper.getLabelOrThrow(labelId);
+        User user = entityHelper.getUserOrThrow(email);
 
         if (!label.getProject().getId().equals(task.getProject().getId())) {
             throw new AppException(ErrorCode.VALIDATION_ERROR);
         }
 
         task.getLabels().add(label);
-        taskRepository.save(task);
 
         invalidateTaskCache(taskId, task.getProject().getId());
 
         activityHelper.log(ActivityAction.TASK_UPDATED, "TASK", task.getId(),
-                task.getProject().getId(), "Added label: " + label.getName(), currentUser.getId());
+                task.getProject().getId(), "Added label: " + label.getName(), user.getId());
     }
 
     @Override
     @Transactional
     public void removeLabelFromTask(UUID taskId, UUID labelId, String email) {
-        Task task = taskRepository.findById(taskId)
-                .orElseThrow(() -> new AppException(ErrorCode.TASK_NOT_FOUND));
 
-        Label label = labelRepository.findById(labelId)
-                .orElseThrow(() -> new AppException(ErrorCode.VALIDATION_ERROR));
-
-        User currentUser = getUserByEmail(email);
+        Task task = entityHelper.getTaskOrThrow(taskId);
+        Label label = entityHelper.getLabelOrThrow(labelId);
+        User user = entityHelper.getUserOrThrow(email);
 
         task.getLabels().remove(label);
-        taskRepository.save(task);
 
         invalidateTaskCache(taskId, task.getProject().getId());
 
         activityHelper.log(ActivityAction.TASK_UPDATED, "TASK", task.getId(),
-                task.getProject().getId(), "Removed label: " + label.getName(), currentUser.getId());
-    }
-
-    private User getUserByEmail(String email) {
-        return userRepository.findByEmail(email)
-                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+                task.getProject().getId(), "Removed label: " + label.getName(), user.getId());
     }
 
     private void invalidateTaskCache(UUID taskId, UUID projectId) {

@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 
 @Service
 @RequiredArgsConstructor
@@ -52,5 +53,38 @@ public class RedisService {
 
     public Long getTtl(String key) {
         return redisTemplate.getExpire(key);
+    }
+
+    public <T> T getOrLoad(String key, TypeReference<T> typeReference, Supplier<T> dbCall, long timeout,
+                           TimeUnit unit) {
+        // 1. GET cache
+        T data = get(key, typeReference);
+        if (data != null) return data;
+        // 2. MISS → DB
+        data = dbCall.get();
+        // 3. SET cache
+        if (data != null) {
+            set(key, data, timeout, unit);
+        }
+
+        return data;
+    }
+
+    public <T> T getOrLoad(String key,
+                           Class<T> clazz,
+                           Supplier<T> dbCall,
+                           long timeout,
+                           TimeUnit unit) {
+
+        T data = get(key, clazz);
+        if (data != null) return data;
+
+        data = dbCall.get();
+
+        if (data != null) {
+            set(key, data, timeout, unit);
+        }
+
+        return data;
     }
 }

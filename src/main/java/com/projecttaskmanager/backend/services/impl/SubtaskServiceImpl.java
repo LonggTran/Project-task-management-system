@@ -1,11 +1,13 @@
 package com.projecttaskmanager.backend.services.impl;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.projecttaskmanager.backend.constants.CacheKey;
 import com.projecttaskmanager.backend.dto.request.task.CreateTaskRequest;
 import com.projecttaskmanager.backend.dto.response.task.SubtaskResponse;
 import com.projecttaskmanager.backend.dto.response.task.SubtaskTreeResponse;
 import com.projecttaskmanager.backend.exceptions.AppException;
 import com.projecttaskmanager.backend.exceptions.ErrorCode;
+import com.projecttaskmanager.backend.helpers.EntityHelper;
 import com.projecttaskmanager.backend.mapper.SubtaskMapper;
 import com.projecttaskmanager.backend.models.Task;
 import com.projecttaskmanager.backend.models.TaskStatus;
@@ -21,31 +23,28 @@ import org.springframework.stereotype.Service;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class SubtaskServiceImpl implements SubtaskService {
 
     private final TaskRepository taskRepository;
-    private final TaskStatusRepository taskStatusRepository;
-    private final UserRepository userRepository;
     private final SubtaskMapper subtaskMapper;
     private final RedisService redisService;
+    private final EntityHelper entityHelper;
 
     @Override
     public SubtaskResponse create(UUID parentTaskId, CreateTaskRequest request) {
 
-        Task parent = taskRepository.findById(parentTaskId)
-                .orElseThrow(() -> new AppException(ErrorCode.TASK_NOT_FOUND));
-
-        TaskStatus status = taskStatusRepository.findById(request.getStatusId())
-                .orElseThrow(() -> new AppException(ErrorCode.TASK_NOT_FOUND));
-
-        User user = userRepository.findByEmail(
+        Task parent = entityHelper.getTaskOrThrow(parentTaskId);
+        TaskStatus status = entityHelper.getTaskStatusOrThrow(request.getStatusId());
+        User user = entityHelper.getUserOrThrow(
                 SecurityContextHolder.getContext().getAuthentication().getName()
-        ).orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+        );
 
         Task subtask = Task.builder()
                 .title(request.getTitle())
@@ -62,7 +61,7 @@ public class SubtaskServiceImpl implements SubtaskService {
 
         Task saved = taskRepository.save(subtask);
 
-        invalidateSubtaskCache(parentTaskId);
+        invalidateSubtaskCacheDeep(parent);
 
         return subtaskMapper.toResponse(saved);
     }
@@ -72,34 +71,31 @@ public class SubtaskServiceImpl implements SubtaskService {
 
         String cacheKey = CacheKey.subtasksByParent(parentTaskId);
 
-        SubtaskResponse[] cached = redisService.get(cacheKey, SubtaskResponse[].class);
-        if (cached != null) return Arrays.asList(cached);
-
-        List<SubtaskResponse> result = taskRepository.findAllByParentTaskId(parentTaskId)
-                .stream()
-                .map(subtaskMapper::toResponse)
-                .toList();
-
-        redisService.set(cacheKey, result, 10, TimeUnit.MINUTES);
-
-        return result;
+        return redisService.getOrLoad(
+                cacheKey,
+                new TypeReference<List<SubtaskResponse>>() {},
+                () -> taskRepository.findAllByParentTaskId(parentTaskId)
+                        .stream()
+                        .map(subtaskMapper::toResponse)
+                        .toList(),
+                10, TimeUnit.MINUTES
+        );
     }
 
     @Override
     public void delete(UUID subtaskId) {
 
-        Task subtask = taskRepository.findById(subtaskId)
-                .orElseThrow(() -> new AppException(ErrorCode.TASK_NOT_FOUND));
+        Task subtask = entityHelper.getTaskOrThrow(subtaskId);
 
         if (subtask.getParentTask() == null) {
             throw new AppException(ErrorCode.VALIDATION_ERROR);
         }
 
-        UUID parentId = subtask.getParentTask().getId();
+        Task parent = subtask.getParentTask();
 
         taskRepository.delete(subtask);
 
-        invalidateSubtaskCache(parentId);
+        invalidateSubtaskCacheDeep(parent);
     }
 
     @Override
@@ -107,35 +103,47 @@ public class SubtaskServiceImpl implements SubtaskService {
 
         String cacheKey = CacheKey.subtaskTree(taskId);
 
-        SubtaskTreeResponse cached = redisService.get(cacheKey, SubtaskTreeResponse.class);
-        if (cached != null) return cached;
+        return redisService.getOrLoad(
+                cacheKey,
+                SubtaskTreeResponse.class,
+                () -> {
+                    Task root = entityHelper.getTaskOrThrow(taskId);
+                    List<Task> allTasks = taskRepository
+                            .findAllByProjectId(root.getProject().getId());
 
-        Task task = taskRepository.findById(taskId)
-                .orElseThrow(() -> new AppException(ErrorCode.TASK_NOT_FOUND));
+                    Map<UUID, List<Task>> childrenMap = allTasks.stream()
+                            .filter(t -> t.getParentTask() != null)
+                            .collect(Collectors.groupingBy(t -> t.getParentTask().getId()));
 
-        SubtaskTreeResponse tree = buildTree(task);
-
-        redisService.set(cacheKey, tree, 10, TimeUnit.MINUTES);
-
-        return tree;
+                    return buildTreeOptimized(root, childrenMap);
+                },
+                5, TimeUnit.MINUTES
+        );
     }
 
-    private SubtaskTreeResponse buildTree(Task task) {
+    private SubtaskTreeResponse buildTreeOptimized(
+            Task task,
+            Map<UUID, List<Task>> childrenMap
+    ) {
+
+        List<SubtaskTreeResponse> children = childrenMap
+                .getOrDefault(task.getId(), List.of())
+                .stream()
+                .map(child -> buildTreeOptimized(child, childrenMap))
+                .toList();
 
         return SubtaskTreeResponse.builder()
                 .task(subtaskMapper.toResponse(task))
-                .children(
-                        task.getSubtasks() == null ? List.of() :
-                                task.getSubtasks()
-                                .stream()
-                                .map(this::buildTree)
-                                .toList()
-                )
+                .children(children)
                 .build();
     }
 
-    private void invalidateSubtaskCache(UUID parentTaskId) {
-        redisService.delete(CacheKey.subtasksByParent(parentTaskId));
-        redisService.delete(CacheKey.subtaskTree(parentTaskId));
+    private void invalidateSubtaskCacheDeep(Task task) {
+
+        while (task != null) {
+            redisService.delete(CacheKey.subtasksByParent(task.getId()));
+            redisService.delete(CacheKey.subtaskTree(task.getId()));
+            task = task.getParentTask();
+        }
     }
 }

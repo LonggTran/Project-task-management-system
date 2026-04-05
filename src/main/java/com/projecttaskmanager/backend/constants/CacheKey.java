@@ -55,4 +55,28 @@ public class CacheKey {
     public static String sprintDetail(UUID sprintId) {
         return "sprint:id:" + sprintId;
     }
+
+    public static String commentsByTask(UUID taskId) {
+        return "comments:task:" + taskId;
+    }
+
+    public static String commentDetail(UUID commentId) {
+        return "comment:" + commentId;
+    }
+
+    public static String projectMembers(UUID projectId) {
+        return "project:members:" + projectId;
+    }
+
+    public static String taskStatuses(UUID projectId) {
+        return "task-statuses:project:" + projectId;
+    }
+
+    public static String taskStatus(UUID id) {
+        return "task-status:" + id;
+    }
+
+    public static String defaultTaskStatus(UUID projectId) {
+        return "task-status:default:" + projectId;
+    }
 }

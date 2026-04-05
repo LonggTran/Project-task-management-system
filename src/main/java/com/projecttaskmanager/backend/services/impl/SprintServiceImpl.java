@@ -1,5 +1,6 @@
 package com.projecttaskmanager.backend.services.impl;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.projecttaskmanager.backend.constants.CacheKey;
 import com.projecttaskmanager.backend.dto.request.sprint.AddTaskToSprintRequest;
 import com.projecttaskmanager.backend.dto.request.sprint.CreateSprintRequest;
@@ -9,6 +10,7 @@ import com.projecttaskmanager.backend.events.ActivityHelper;
 import com.projecttaskmanager.backend.events.NotificationEvent;
 import com.projecttaskmanager.backend.exceptions.AppException;
 import com.projecttaskmanager.backend.exceptions.ErrorCode;
+import com.projecttaskmanager.backend.helpers.EntityHelper;
 import com.projecttaskmanager.backend.mapper.SprintMapper;
 import com.projecttaskmanager.backend.mapper.SprintTaskMapper;
 import com.projecttaskmanager.backend.models.*;
@@ -34,20 +36,18 @@ public class SprintServiceImpl implements SprintService {
 
     private final SprintRepository sprintRepository;
     private final SprintTaskRepository sprintTaskRepository;
-    private final ProjectRepository projectRepository;
-    private final TaskRepository taskRepository;
     private final SprintMapper sprintMapper;
     private final SprintTaskMapper sprintTaskMapper;
     private final ProjectAuthorizationService auth;
     private final ActivityHelper activityHelper;
     private final ApplicationEventPublisher eventPublisher;
     private final RedisService redisService;
+    private final EntityHelper entityHelper;
 
     @Override
     public SprintResponse create(CreateSprintRequest request) {
 
-        Project project = projectRepository.findById(request.getProjectId())
-                .orElseThrow(() -> new AppException(ErrorCode.PROJECT_NOT_FOUND));
+        Project project = entityHelper.getProjectOrThrow(request.getProjectId());
 
         auth.checkPermission(project.getId(), "SPRINT_CREATE");
 
@@ -78,8 +78,7 @@ public class SprintServiceImpl implements SprintService {
     @Override
     public SprintResponse startSprint(UUID sprintId) {
 
-        Sprint sprint = sprintRepository.findById(sprintId)
-                .orElseThrow(() -> new RuntimeException("Sprint not found"));
+        Sprint sprint = getSprintOrThrow(sprintId);
 
         auth.checkPermission(sprint.getProject().getId(), "SPRINT_UPDATE");
 
@@ -105,8 +104,7 @@ public class SprintServiceImpl implements SprintService {
     @Override
     public SprintResponse closeSprint(UUID sprintId) {
 
-        Sprint sprint = sprintRepository.findById(sprintId)
-                .orElseThrow(() -> new RuntimeException("Sprint not found"));
+        Sprint sprint = getSprintOrThrow(sprintId);
 
         auth.checkPermission(sprint.getProject().getId(), "SPRINT_UPDATE");
 
@@ -132,8 +130,7 @@ public class SprintServiceImpl implements SprintService {
     @Override
     public SprintTaskResponse addTask(AddTaskToSprintRequest request) {
 
-        Sprint sprint = sprintRepository.findById(request.getSprintId())
-                .orElseThrow(() -> new RuntimeException("Sprint not found"));
+        Sprint sprint = getSprintOrThrow(request.getSprintId());
 
         if (sprint.getStatus() != SprintStatus.PLANNING) {
             throw new RuntimeException("Cannot add task when sprint is not PLANNING");
@@ -141,19 +138,18 @@ public class SprintServiceImpl implements SprintService {
 
         auth.checkPermission(sprint.getProject().getId(), "SPRINT_UPDATE");
 
-        Task task = taskRepository.findById(request.getTaskId())
-                .orElseThrow(() -> new AppException(ErrorCode.TASK_NOT_FOUND));
+        Task task = entityHelper.getTaskOrThrow(request.getTaskId());
 
         if (sprintTaskRepository.findBySprintAndTask(sprint, task).isPresent()) {
             throw new RuntimeException("Task already in sprint");
         }
 
-        SprintTask st = SprintTask.builder()
-                .sprint(sprint)
-                .task(task)
-                .build();
-
-        SprintTask saved = sprintTaskRepository.save(st);
+        SprintTask saved = sprintTaskRepository.save(
+                SprintTask.builder()
+                        .sprint(sprint)
+                        .task(task)
+                        .build()
+        );
 
         redisService.delete(CacheKey.sprintTasks(sprint.getId()));
 
@@ -184,22 +180,20 @@ public class SprintServiceImpl implements SprintService {
 
         String cacheKey = CacheKey.sprintsByProject(projectId);
 
-        SprintResponse[] cached = redisService.get(cacheKey, SprintResponse[].class);
-        if (cached != null) return Arrays.asList(cached);
+        return redisService.getOrLoad(
+                cacheKey,
+                new TypeReference<List<SprintResponse>>() {},
+                () -> {
+                    Project project = entityHelper.getProjectOrThrow(projectId);
+                    auth.checkPermission(projectId, "SPRINT_VIEW");
 
-        Project project = projectRepository.findById(projectId)
-                .orElseThrow(() -> new AppException(ErrorCode.PROJECT_NOT_FOUND));
-
-        auth.checkPermission(projectId, "SPRINT_VIEW");
-
-        List<SprintResponse> result = sprintRepository.findByProject(project)
-                .stream()
-                .map(sprintMapper::toResponse)
-                .toList();
-
-        redisService.set(cacheKey, result, 10, TimeUnit.MINUTES);
-
-        return result;
+                    return sprintRepository.findByProject(project)
+                            .stream()
+                            .map(sprintMapper::toResponse)
+                            .toList();
+                },
+                10, TimeUnit.MINUTES
+        );
     }
 
     @Override
@@ -207,29 +201,26 @@ public class SprintServiceImpl implements SprintService {
 
         String cacheKey = CacheKey.sprintTasks(sprintId);
 
-        SprintTaskResponse[] cached = redisService.get(cacheKey, SprintTaskResponse[].class);
-        if (cached != null) return Arrays.asList(cached);
+        return redisService.getOrLoad(
+                cacheKey,
+                new TypeReference<List<SprintTaskResponse>>() {},
+                () -> {
+                    Sprint sprint = getSprintOrThrow(sprintId);
+                    auth.checkPermission(sprint.getProject().getId(), "SPRINT_VIEW");
 
-        Sprint sprint = sprintRepository.findById(sprintId)
-                .orElseThrow(() -> new AppException(ErrorCode.PROJECT_NOT_FOUND));
-
-        auth.checkPermission(sprint.getProject().getId(), "SPRINT_VIEW");
-
-        List<SprintTaskResponse> result = sprintTaskRepository.findBySprint(sprint)
-                .stream()
-                .map(sprintTaskMapper::toResponse)
-                .toList();
-
-        redisService.set(cacheKey, result, 10, TimeUnit.MINUTES);
-
-        return result;
+                    return sprintTaskRepository.findBySprint(sprint)
+                            .stream()
+                            .map(sprintTaskMapper::toResponse)
+                            .toList();
+                },
+                10, TimeUnit.MINUTES
+        );
     }
 
     @Override
     public SprintResponse update(UUID sprintId, CreateSprintRequest request) {
 
-        Sprint sprint = sprintRepository.findById(sprintId)
-                .orElseThrow(() -> new AppException(ErrorCode.SPRINT_NOT_FOUND));
+        Sprint sprint = getSprintOrThrow(sprintId);
 
         auth.checkPermission(sprint.getProject().getId(), "SPRINT_UPDATE");
 
@@ -252,8 +243,7 @@ public class SprintServiceImpl implements SprintService {
     @Transactional
     public void delete(UUID sprintId) {
 
-        Sprint sprint = sprintRepository.findById(sprintId)
-                .orElseThrow(() -> new AppException(ErrorCode.SPRINT_NOT_FOUND));
+        Sprint sprint = getSprintOrThrow(sprintId);
 
         auth.checkPermission(sprint.getProject().getId(), "SPRINT_DELETE");
 
@@ -265,6 +255,11 @@ public class SprintServiceImpl implements SprintService {
         sprintRepository.delete(sprint);
 
         invalidateSprintCache(sprint);
+    }
+
+    private Sprint getSprintOrThrow(UUID id) {
+        return sprintRepository.findById(id)
+                .orElseThrow(() -> new AppException(ErrorCode.SPRINT_NOT_FOUND));
     }
 
     private void invalidateSprintCache(Sprint sprint) {
