@@ -1,109 +1,119 @@
 # Project task management system
 
-![Java](https://img.shields.io/badge/Java-17-blue)
+![Java](https://img.shields.io/badge/Java-21-blue)
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-Framework-brightgreen)
 ![Spring Security](https://img.shields.io/badge/Security-JWT-orange)
-![Database](https://img.shields.io/badge/Database-MySQL%20%7C%20PostgreSQL-blue)
-![Redis](https://img.shields.io/badge/Cache-Redis-red)
-![WebSocket](https://img.shields.io/badge/Realtime-WebSocket-purple)
-![Build](https://img.shields.io/badge/Build-Maven-yellow)
-![Docker](https://img.shields.io/badge/Deploy-Docker-blue)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Database-blue)
+![Redis](https://img.shields.io/badge/Redis-Cache-red)
+![WebSocket](https://img.shields.io/badge/WebSocket-Realtime-purple)
+![Docker](https://img.shields.io/badge/Docker-Containerization-blue)
 
 ---
 
 ## Overview
-This project is a **Task Management Backend System** designed to support Agile workflows.  
-It provides RESTful APIs for managing projects, tasks, sprints, epics, comments, attachments, and notifications.
+This project is a **Project task management Backend System** designed to support Agile workflows.
 
-The system is built with a focus on **scalability, performance, and security**.
+It provides RESTful APIs for:
+- Project management
+- Task, Subtask, Sprint, Epic management
+- Comment & attachment handling
+- Realtime notifications
+
+The system focuses on **performance optimization, security, and scalability**.
 
 ---
 
 ## Tech Stack
 
 ### Programming Language
-![Java](https://img.shields.io/badge/Java-17-blue)
-
----
+<p>
+  <img src="https://img.shields.io/badge/Java-21-blue"/>
+</p>
 
 ### Framework & Technologies
-![Spring Boot](https://img.shields.io/badge/Spring%20Boot-Framework-brightgreen)
-![Spring Security](https://img.shields.io/badge/Security-JWT-orange)
-![Spring Data JPA](https://img.shields.io/badge/JPA-Hibernate-yellowgreen)
-![WebSocket](https://img.shields.io/badge/WebSocket-Realtime-purple)
-![JavaMail](https://img.shields.io/badge/Email-JavaMailSender-lightgrey)
-
----
+<p>
+  <img src="https://img.shields.io/badge/SpringBoot-Framework-brightgreen"/>
+  <img src="https://img.shields.io/badge/SpringSecurity-JWT-orange"/>
+  <img src="https://img.shields.io/badge/JPA-Hibernate-yellowgreen"/>
+  <img src="https://img.shields.io/badge/WebSocket-Realtime-purple"/>
+  <img src="https://img.shields.io/badge/JavaMail-Email-lightgrey"/>
+</p>
 
 ### Database
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Database-blue)
-![Redis](https://img.shields.io/badge/Redis-Cache-red)
-
----
+<p>
+  <img src="https://img.shields.io/badge/PostgreSQL-Database-blue"/>
+  <img src="https://img.shields.io/badge/Redis-Cache-red"/>
+</p>
 
 ### Tools
-![Docker](https://img.shields.io/badge/Docker-Containerization-blue)
-![Gradle](https://img.shields.io/badge/Gradle-Build-red)
-
----
+<p>
+  <img src="https://img.shields.io/badge/Docker-Containerization-blue"/>
+  <img src="https://img.shields.io/badge/Gradle-Build-red"/>
+  <img src="https://img.shields.io/badge/Postman-API_Testing-orange"/>
+</p>
 
 ### Knowledge
-![REST API](https://img.shields.io/badge/Architecture-RESTful_API-green)
-![JWT](https://img.shields.io/badge/Auth-JWT-black)
-![RBAC](https://img.shields.io/badge/Security-RBAC-important)
-![Caching](https://img.shields.io/badge/Performance-Caching-blueviolet)
-![WebSocket](https://img.shields.io/badge/Realtime-WebSocket-purple)
-![Agile](https://img.shields.io/badge/Methodology-Agile-orange)
+<p>
+  <img src="https://img.shields.io/badge/REST-API-green"/>
+  <img src="https://img.shields.io/badge/JWT-Auth-black"/>
+  <img src="https://img.shields.io/badge/RBAC-Authorization-important"/>
+  <img src="https://img.shields.io/badge/Caching-Redis-blueviolet"/>
+  <img src="https://img.shields.io/badge/Agile-Workflow-orange"/>
+</p>
 
 ---
 
-## Performance
+## Key Features
 
-- Redis caching applied for:
-  - Project list
-  - Comments (list & detail)
-  - Sprint, Task, Subtask and Epic management data
-- Cache-aside pattern (`getOrLoad`) to reduce database load
-- Optimized queries to avoid N+1 issues
-- Clear cache invalidation strategy
+- JWT Authentication (Access + Refresh Token)
+- Role-based Authorization (RBAC)
+- Redis caching for performance optimization
+- Token blacklist & refresh token management with Redis
+- Realtime notification using WebSocket
+- OTP Email verification
+- File upload & attachment management
+- Activity logging system
+
+---
+
+## Performance & Testing
+
+- API Testing using Postman
+- Load testing with 200+ concurrent requests
+- Tested across 10+ APIs
+- Average response time:
+  - ~30–45ms/request (with Redis caching)
+
+- Performance optimization:
+  - Cache-aside pattern
+  - Reduced database load using Redis
+  - Optimized queries to avoid N+1 issues
 
 ---
 
 ## Security
 
-- JWT Authentication:
-  - Access Token
-  - Refresh Token
-- Redis-based token management:
-  - Token blacklist on logout
-  - Refresh token validation
-- Google Login (OAuth2)
+- JWT Authentication (Access & Refresh Token)
+- Token blacklist (Redis)
+- Role-based access control (RBAC)
+- Input validation (Spring Validation)
+- Secure file upload (sanitize filename)
 - OTP Email Verification
-- Request validation (Spring Validation)
-- Secure file upload (sanitized filename)
+- Google OAuth2 Login (optional)
 
 ---
 
-## Authorization
+## Architecture
 
-- Role-based & Permission-based system
-- Roles: OWNER, MEMBER, etc.
-- Fine-grained permissions:
-  - PROJECT_UPDATE
-  - TASK_CREATE
-  - COMMENT_DELETE
-- Authorization handled at Service layer
-
----
-
-## Performance Testing
-
-- Tested with:
-  - Postman
-- Metrics:
-  - API response time
-  - Cache efficiency
-- Compared performance with and without Redis cache
+- Layered Architecture:
+  - Controller
+  - Service
+  - Repository
+- DTO Pattern
+- Global Exception Handling
+- Event-driven components:
+  - Notification
+  - Activity Logging
 
 ---
 
