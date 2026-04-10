@@ -67,4 +67,10 @@ public class JwtServiceImpl implements JwtService {
                 .parseClaimsJws(token)
                 .getBody();
     }
+
+    @Override
+    public long getRemainingTime(String token) {
+        Date expiration = extractAllClaims(token).getExpiration();
+        return expiration.getTime() - System.currentTimeMillis();
+    }
 }

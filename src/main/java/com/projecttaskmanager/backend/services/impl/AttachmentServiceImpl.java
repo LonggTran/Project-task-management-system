@@ -40,7 +40,7 @@ public class AttachmentServiceImpl implements AttachmentService {
     private final UserRepository userRepository;
     private final AttachmentMapper attachmentMapper;
     private final ActivityHelper activityHelper;
-    private final ApplicationEventPublisher eventPublisher; // Thêm field này
+    private final ApplicationEventPublisher eventPublisher;
     private final TaskAssigneeRepository taskAssigneeRepository;
 
     @Value("${file.upload-dir:uploads}")

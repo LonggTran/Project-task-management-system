@@ -15,4 +15,5 @@ public interface TaskStatusRepository extends JpaRepository<TaskStatus, UUID> {
     Optional<TaskStatus> findByNameAndProject(String name, Project project);
     Optional<TaskStatus> findByIsDefaultTrueAndProject(Project project);
     Optional<TaskStatus> findByIdAndProject(UUID id, Project project);
+    Optional<TaskStatus> findByProjectIdAndIsDefaultTrue(UUID projectId);
 }

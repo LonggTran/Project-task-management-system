@@ -1,51 +1,50 @@
 package com.projecttaskmanager.backend.services.impl;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.projecttaskmanager.backend.constants.CacheKey;
 import com.projecttaskmanager.backend.dto.request.epic.CreateEpicRequest;
 import com.projecttaskmanager.backend.dto.request.epic.UpdateEpicRequest;
 import com.projecttaskmanager.backend.dto.response.epic.EpicResponse;
 import com.projecttaskmanager.backend.events.ActivityHelper;
-import com.projecttaskmanager.backend.events.NotificationEvent;
-import com.projecttaskmanager.backend.exceptions.AppException;
-import com.projecttaskmanager.backend.exceptions.ErrorCode;
+import com.projecttaskmanager.backend.helpers.EntityHelper;
 import com.projecttaskmanager.backend.mapper.EpicMapper;
 import com.projecttaskmanager.backend.models.Epic;
 import com.projecttaskmanager.backend.models.Project;
 import com.projecttaskmanager.backend.models.User;
 import com.projecttaskmanager.backend.models.enums.ActivityAction;
 import com.projecttaskmanager.backend.repositories.EpicRepository;
-import com.projecttaskmanager.backend.repositories.ProjectRepository;
-import com.projecttaskmanager.backend.repositories.UserRepository;
 import com.projecttaskmanager.backend.services.EpicService;
 import com.projecttaskmanager.backend.services.ProjectAuthorizationService;
+import com.projecttaskmanager.backend.services.RedisService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 @Service
 @RequiredArgsConstructor
 public class EpicServiceImpl implements EpicService {
 
     private final EpicRepository epicRepository;
-    private final ProjectRepository projectRepository;
-    private final UserRepository userRepository;
     private final EpicMapper epicMapper;
     private final ProjectAuthorizationService authorizationService;
-    private final ApplicationEventPublisher eventPublisher;
     private final ActivityHelper activityHelper;
+    private final RedisService redisService;
+    private final EntityHelper entityHelper;
+
+    private static final long LIST_CACHE_TTL = 30;
+    private static final long DETAIL_CACHE_TTL = 10;
 
     @Override
-    public EpicResponse create(CreateEpicRequest request) {
-
+    @Transactional
+    public EpicResponse create(CreateEpicRequest request, String email) {
         authorizationService.checkPermission(request.getProjectId(), "EPIC_CREATE");
 
-        Project project = projectRepository.findById(request.getProjectId())
-                .orElseThrow(() -> new AppException(ErrorCode.PROJECT_NOT_FOUND));
-
-        User user = getCurrentUser();
+        Project project = entityHelper.getProjectOrThrow(request.getProjectId());
+        User user = entityHelper.getUserOrThrow(email);
 
         Epic epic = Epic.builder()
                 .name(request.getName())
@@ -58,24 +57,23 @@ public class EpicServiceImpl implements EpicService {
 
         Epic saved = epicRepository.save(epic);
 
-        activityHelper.log(
-                ActivityAction.EPIC_CREATED,
-                "EPIC",
-                saved.getId(),
-                project.getId(),
-                "Created epic: " + saved.getName(),
-                user.getId()
-        );
+        activityHelper.log(ActivityAction.EPIC_CREATED, "EPIC", saved.getId(),
+                project.getId(), "Created epic: " + saved.getName(), user.getId());
+
+        redisService.delete(CacheKey.epicsByProject(project.getId()));
 
         return epicMapper.toResponse(saved);
     }
 
-    // services/impl/EpicServiceImpl.java - Đảm bảo update hoạt động
     @Override
-    public EpicResponse update(UUID epicId, UpdateEpicRequest request) {
-        Epic epic = getEpic(epicId);
+    @Transactional
+    public EpicResponse update(UUID epicId, UpdateEpicRequest request, String email) {
+        Epic epic = entityHelper.getEpicOrThrow(epicId);
+        UUID projectId = epic.getProject().getId();
 
-        authorizationService.checkPermission(epic.getProject().getId(), "EPIC_UPDATE");
+        authorizationService.checkPermission(projectId, "EPIC_UPDATE");
+
+        User user = entityHelper.getUserOrThrow(email);
 
         if (request.getName() != null) epic.setName(request.getName());
         if (request.getDescription() != null) epic.setDescription(request.getDescription());
@@ -84,60 +82,65 @@ public class EpicServiceImpl implements EpicService {
 
         Epic saved = epicRepository.save(epic);
 
-        // Log activity
-        activityHelper.log(
-                ActivityAction.EPIC_UPDATED,
-                "EPIC",
-                saved.getId(),
-                epic.getProject().getId(),
-                "Updated epic: " + saved.getName(),
-                getCurrentUser().getId()
-        );
+        activityHelper.log(ActivityAction.EPIC_UPDATED, "EPIC", saved.getId(),
+                projectId, "Updated epic: " + saved.getName(), user.getId());
+
+        redisService.delete(CacheKey.epicDetail(epicId));
+        redisService.delete(CacheKey.epicsByProject(projectId));
 
         return epicMapper.toResponse(saved);
     }
 
     @Override
-    public void delete(UUID epicId) {
+    @Transactional
+    public void delete(UUID epicId, String email) {
+        Epic epic = entityHelper.getEpicOrThrow(epicId);
+        UUID projectId = epic.getProject().getId();
 
-        Epic epic = getEpic(epicId);
+        authorizationService.checkPermission(projectId, "EPIC_DELETE");
 
-        authorizationService.checkPermission(epic.getProject().getId(), "EPIC_DELETE");
+        User user = entityHelper.getUserOrThrow(email);
 
         epicRepository.delete(epic);
+
+        activityHelper.log(ActivityAction.EPIC_DELETED, "EPIC", epicId,
+                projectId, "Deleted epic: " + epic.getName(), user.getId());
+
+        redisService.delete(CacheKey.epicDetail(epicId));
+        redisService.delete(CacheKey.epicsByProject(projectId));
     }
 
     @Override
     public EpicResponse getById(UUID epicId) {
-
-        Epic epic = getEpic(epicId);
-
+        Epic epic = entityHelper.getEpicOrThrow(epicId);
         authorizationService.checkPermission(epic.getProject().getId(), "EPIC_VIEW");
 
-        return epicMapper.toResponse(epic);
+        String cacheKey = CacheKey.epicDetail(epicId);
+
+        return redisService.getOrLoad(
+                cacheKey,
+                EpicResponse.class,
+                () -> epicMapper.toResponse(epic),
+                DETAIL_CACHE_TTL,
+                TimeUnit.MINUTES
+        );
     }
 
     @Override
     public List<EpicResponse> getAllByProject(UUID projectId) {
-
         authorizationService.checkPermission(projectId, "EPIC_VIEW");
 
-        return epicRepository.findAllByProjectId(projectId)
-                .stream()
-                .map(epicMapper::toResponse)
-                .toList();
-    }
+        String cacheKey = CacheKey.epicsByProject(projectId);
 
-    // ================= HELPER =================
-
-    private Epic getEpic(UUID id) {
-        return epicRepository.findById(id)
-                .orElseThrow(() -> new AppException(ErrorCode.PROJECT_NOT_FOUND));
-    }
-
-    private User getCurrentUser() {
-        return userRepository.findByEmail(
-                SecurityContextHolder.getContext().getAuthentication().getName()
-        ).orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+        return redisService.getOrLoad(
+                cacheKey,
+                new TypeReference<List<EpicResponse>>() {},
+                () -> epicRepository.findAllByProjectId(projectId)
+                        .stream()
+                        .map(epicMapper::toResponse)
+                        .toList(),
+                LIST_CACHE_TTL,
+                TimeUnit.MINUTES
+        );
     }
 }
